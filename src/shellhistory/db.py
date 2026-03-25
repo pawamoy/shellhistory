@@ -19,7 +19,7 @@ from sqlalchemy import (
     exc,
 )
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import scoped_session, sessionmaker
 from tqdm import tqdm
 
 DEFAULT_DIR = Path.home() / ".shellhistory"
@@ -41,7 +41,7 @@ else:
     HISTFILE_PATH = Path(HISTFILE_PATH)
 
 Base = declarative_base()
-engine = create_engine("sqlite:///%s?check_same_thread=False" % DB_PATH)
+engine = create_engine("sqlite:///%s" % DB_PATH, connect_args={"check_same_thread": False})
 
 
 def create_tables():
@@ -52,13 +52,11 @@ if not DB_PATH.exists():
     create_tables()
 
 
-Session = sessionmaker(bind=engine)
+Session = scoped_session(sessionmaker(bind=engine))
 
 
 def get_session():
-    _engine = create_engine("sqlite:///%s" % DB_PATH)
-    session = sessionmaker(bind=_engine)
-    return session()
+    return Session
 
 
 class History(Base):

@@ -62,6 +62,11 @@ admin = Admin(app, name="Shell History", template_mode="bootstrap3")
 admin.add_view(HistoryModelView(db.History, db.get_session()))
 
 
+@app.teardown_appcontext
+def shutdown_session(exception=None):
+    db.Session.remove()
+
+
 # Utils -----------------------------------------------------------------------
 def since_epoch(date):
     return time.mktime(date.timetuple())
