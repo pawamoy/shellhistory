@@ -157,17 +157,41 @@ fi
 
 # PORTABLE FALLBACKS -----------------------------------------------------------
 
+# Used when neither zsh/datetime nor Bash 5's $EPOCHREALTIME is available
+# (notably Bash 3.2, which is what macOS ships).
+if ! command -v _shellhistory_time_now >/dev/null 2>&1; then
+  _shellhistory_nanos="$(date '+%N' 2>/dev/null)"
+  case "${_shellhistory_nanos}" in
+    '' | *[!0-9]*)
+      # BSD/macOS date has no %N and prints a literal "N": fall back to
+      # whole-second resolution rather than emitting "1786961197N" and landing
+      # every timestamp somewhere in 1970.
+      _shellhistory_time_now() {
+        _SHELLHISTORY_NOW="$(date '+%s')000000"
+      }
+      ;;
+    *)
+      _shellhistory_time_now() {
+        local now
+        now="$(date '+%s%N')"
+        _SHELLHISTORY_NOW="${now%???}"
+      }
+      ;;
+  esac
+  unset _shellhistory_nanos
+fi
+
+# Fallback for shells that are neither Bash nor Zsh.
+if ! command -v _shellhistory_is_private >/dev/null 2>&1; then
+  _shellhistory_is_private() { return 1; }
+fi
+
 # GNU coreutils understands -w0; BSD/macOS base64 does not and would fail on
 # every single command, leaving the path and parents columns empty.
 if printf '' | base64 -w0 >/dev/null 2>&1; then
   _shellhistory_b64() { base64 -w0; }
 else
   _shellhistory_b64() { base64 | tr -d '\n'; }
-fi
-
-# Fallback for shells that are neither Bash nor Zsh.
-if ! command -v _shellhistory_is_private >/dev/null 2>&1; then
-  _shellhistory_is_private() { return 1; }
 fi
 
 # HELPERS ----------------------------------------------------------------------
@@ -236,30 +260,6 @@ _shellhistory_detect_shell() {
   fi
   printf '%s' "${exe}"
 }
-
-# Used when neither zsh/datetime nor Bash 5's $EPOCHREALTIME is available
-# (notably Bash 3.2, which is what macOS ships).
-if ! command -v _shellhistory_time_now >/dev/null 2>&1; then
-  _shellhistory_nanos="$(date '+%N' 2>/dev/null)"
-  case "${_shellhistory_nanos}" in
-    '' | *[!0-9]*)
-      # BSD/macOS date has no %N and prints a literal "N": fall back to
-      # whole-second resolution rather than emitting "1786961197N" and landing
-      # every timestamp somewhere in 1970.
-      _shellhistory_time_now() {
-        _SHELLHISTORY_NOW="$(date '+%s')000000"
-      }
-      ;;
-    *)
-      _shellhistory_time_now() {
-        local now
-        now="$(date '+%s%N')"
-        _SHELLHISTORY_NOW="${now%???}"
-      }
-      ;;
-  esac
-  unset _shellhistory_nanos
-fi
 
 _shellhistory_start_timer() {
   if [ -z "${_SHELLHISTORY_START_TIME}" ]; then
