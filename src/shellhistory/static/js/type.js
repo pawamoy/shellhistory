@@ -1,6 +1,8 @@
 $(document).ready(function () {
 
-  $.getJSON('/type_json', function (data) {
+  // Forward the page's query string, so /type?normalize=1 asks the endpoint to
+  // fold Zsh's type names onto Bash's before the slices are counted.
+  $.getJSON('/type_json' + window.location.search, function (data) {
 
     Highcharts.chart('container', {
       chart: {

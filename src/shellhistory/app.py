@@ -5,7 +5,7 @@ import time
 from collections import Counter, defaultdict
 from datetime import datetime
 
-from flask import Flask, jsonify, render_template
+from flask import Flask, jsonify, render_template, request
 from flask_admin import Admin
 from flask_admin.contrib.sqla import ModelView
 from sqlalchemy import desc, extract, func
@@ -430,12 +430,26 @@ def trending_json():
     return jsonify(data)
 
 
+# Command types are recorded in the vocabulary of the shell that produced them:
+# Zsh's `whence -w` says "command" and "reserved" where Bash's `type -t` says
+# "file" and "keyword". That distinction is worth keeping in the database, but
+# it splits one concept into two slices in a chart, so callers can ask for the
+# names to be folded onto Bash's vocabulary at display time.
+NORMALIZED_TYPES = {"command": "file", "hashed": "file", "reserved": "keyword"}
+
+
 @app.route("/type_json")
 def type_json():
+    normalize = request.args.get("normalize", "").lower() in ("1", "true", "yes", "on")
     session = db.Session()
     results = session.query(db.History.type, func.count(db.History.type)).group_by(db.History.type).all()
-    # total = sum(r[1] for r in results)
-    data = [{"name": r[0] or "none", "y": r[1]} for r in sorted(results, key=lambda x: x[1], reverse=True)]
+    counts = defaultdict(int)
+    for type_name, count in results:
+        name = type_name or "none"
+        if normalize:
+            name = NORMALIZED_TYPES.get(name, name)
+        counts[name] += count
+    data = [{"name": name, "y": count} for name, count in sorted(counts.items(), key=lambda x: x[1], reverse=True)]
     return jsonify(data)
 
 

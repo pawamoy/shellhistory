@@ -58,8 +58,10 @@ if [ -n "${ZSH_VERSION}" ]; then
   fi
 
   if [ -n "${builtins+x}" ]; then
-    # Mirrors `whence -w`, zsh's own vocabulary, so the fast path and the
-    # fallback below cannot disagree about what a command is.
+    # Deliberately zsh's own vocabulary, matching `whence -w`: what a shell
+    # calls things is part of the record. Folding zsh's "command"/"reserved"
+    # into Bash's "file"/"keyword" is a display-time concern -- see the
+    # normalize option of the /type_json endpoint.
     _shellhistory_set_command_type() {
       local word
       _shellhistory_first_word
@@ -84,7 +86,8 @@ if [ -n "${ZSH_VERSION}" ]; then
       local type
       _shellhistory_first_word
       type="$(whence -w -- "${_SHELLHISTORY_WORD}" 2>/dev/null)"
-      _SHELLHISTORY_TYPE="${type##*: }"
+      type="${type##*: }"
+      _SHELLHISTORY_TYPE="${type:-none}"
     }
   fi
 
@@ -123,11 +126,13 @@ elif [ -n "${BASH_VERSION}" ]; then
     }
   fi
 
+  # Bash's own vocabulary, straight from `type -t` ("file", "keyword", ...),
+  # with its empty output for an unknown word spelled out as "none".
   _shellhistory_set_command_type() {
     local type
     _shellhistory_first_word
     type="$(type -t "${_SHELLHISTORY_WORD}" 2>/dev/null)"
-    _SHELLHISTORY_TYPE="${type}"
+    _SHELLHISTORY_TYPE="${type:-none}"
   }
 
   _shellhistory_last_command_number() {
