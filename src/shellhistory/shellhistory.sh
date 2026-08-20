@@ -333,7 +333,8 @@ _shellhistory_after() {
   _shellhistory_stop_timer
 
   [ "${_SHELLHISTORY_BEFORE_DONE}" -eq 2 ] && _SHELLHISTORY_BEFORE_DONE=0
-  [ "${_SHELLHISTORY_AFTER_DONE}" -eq 1 ] && return
+  # Always return the real exit code: prompt themes run after us and read $?.
+  [ "${_SHELLHISTORY_AFTER_DONE}" -eq 1 ] && return "${_SHELLHISTORY_CODE}"
 
   _shellhistory_append
   _SHELLHISTORY_START_TIME=
