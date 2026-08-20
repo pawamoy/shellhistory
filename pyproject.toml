@@ -1,81 +1,94 @@
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
 
-[tool.poetry]
+[project]
 name = "shellhistory"
-version = "0.2.4"
 description = "Visualize your usage of Bash/Zsh through a web app thanks to Flask and Highcharts!"
-authors = ["Timothée Mazzucotelli <dev@pawamoy.fr>"]
-license = "ISC License"
+authors = [{name = "Timothée Mazzucotelli", email = "dev@pawamoy.fr"}]
+license = {text = "ISC"}
 readme = "README.md"
-repository = "https://github.com/pawamoy/shellhistory"
-homepage = "https://[[ repository_provider ]]/[[ repository_namespace ]]/[[ repository_name ]]"
+requires-python = ">=3.8"
 keywords = []
-packages = [ { include = "[[ python_package_import_name ]]", from = "src" } ]
+dynamic = ["version"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Documentation",
+    "Topic :: Software Development",
+    "Topic :: Utilities",
+    "Typing :: Typed",
+]
+dependencies = []
 
-[tool.poetry.dependencies]
-python = ">=3.6.2,<4.0"
+[project.urls]
+Homepage = "https://pawamoy.github.io/shellhistory"
+Documentation = "https://pawamoy.github.io/shellhistory"
+Changelog = "https://pawamoy.github.io/shellhistory/changelog"
+Repository = "https://github.com/pawamoy/shellhistory"
+Issues = "https://github.com/pawamoy/shellhistory/issues"
+Discussions = "https://github.com/pawamoy/shellhistory/discussions"
+Gitter = "https://gitter.im/shellhistory/community"
+Funding = "https://github.com/sponsors/pawamoy"
 
-[tool.poetry.dev-dependencies]
-# formatting, quality, tests
-autoflake = ">=1.4"
-black = ">=21.12b0"
-isort = ">=5.7.0"
-mypy = ">=0.812"
-pytest = ">=6.2.2"
-pytest-cov = ">=2.11.1"
-pytest-randomly = ">=3.5.0"
-pytest-sugar = ">=0.9.4"
-pytest-xdist = ">=2.2.0"
-types-toml = ">=0.10.1"
+[project.scripts]
+shellhistory = "shellhistory.cli:main"
 
-# tasks
-duty = ">=0.6.0"
-git-changelog = ">=0.5.0"
-httpx = ">=0.16.1"
-jinja2-cli = ">=0.7.0"
-toml = ">=0.10.2"
+[tool.pdm]
+version = {source = "scm"}
+plugins = [
+    "pdm-multirun",
+]
 
-# flake8 plugins
-darglint = ">=1.5.8"
-flake8 = ">=3.7.0"
-flake8-bandit = ">=2.1.2"
-flake8-black = ">=0.2.1"
-flake8-bugbear = ">=20.11.1"
-flake8-builtins = ">=1.5.3"
-flake8-comprehensions = ">=3.3.1"
-flake8-docstrings = ">=1.5.0"
-flake8-pytest-style = ">=1.3.0"
-flake8-string-format = ">=0.3.0"
-flake8-tidy-imports = ">=4.2.1"
-flake8-variables-names = ">=0.0.4"
-pep8-naming = ">=0.11.1"
-pydocstyle = ">=6.1.1"
-wps-light = ">=0.15.2"
+[tool.pdm.build]
+package-dir = "src"
+editable-backend = "editables"
 
-# docs
-mkdocs = ">=1.2.2"
-mkdocs-coverage = ">=0.2.1"
-mkdocs-macros-plugin = ">=0.5.0"
-mkdocs-material = ">=6.2.7"
-mkdocstrings = ">=0.16.2"
-
-[tool.poetry.scripts]
-shellhistory-cli = "shellhistory.cli:main"
-shellhistory-location = "shellhistory.cli:location"
-shellhistory-web = "shellhistory.cli:web"
-
-[tool.black]
-line-length = 120
-exclude = "tests/fixtures"
-
-[tool.isort]
-line_length = 120
-not_skip = "__init__.py"
-multi_line_output = 3
-force_single_line = false
-balanced_wrapping = true
-default_section = "THIRDPARTY"
-known_first_party = "shellhistory"
-include_trailing_comma = true
+[tool.pdm.dev-dependencies]
+duty = ["duty>=0.10"]
+ci-quality = ["shellhistory[duty,docs,quality,typing,security]"]
+ci-tests = ["shellhistory[duty,tests]"]
+docs = [
+    "black>=23.9",
+    "markdown-callouts>=0.3",
+    "markdown-exec>=1.7",
+    "mkdocs>=1.5",
+    "mkdocs-coverage>=1.0",
+    "mkdocs-gen-files>=0.5",
+    "mkdocs-git-committers-plugin-2>=1.2",
+    "mkdocs-literate-nav>=0.6",
+    "mkdocs-material>=9.4",
+    "mkdocs-minify-plugin>=0.7",
+    "mkdocstrings[python]>=0.23",
+    "tomli>=2.0; python_version < '3.11'",
+]
+maintain = [
+    "black>=23.9",
+    "blacken-docs>=1.16",
+    "git-changelog>=2.3",
+]
+quality = [
+    "ruff>=0.0",
+]
+tests = [
+    "pytest>=7.4",
+    "pytest-cov>=4.1",
+    "pytest-randomly>=3.15",
+    "pytest-xdist>=3.3",
+]
+typing = [
+    "mypy>=1.5",
+    "types-markdown>=3.5",
+    "types-pyyaml>=6.0",
+]
+security = [
+    "safety>=2.3",
+]

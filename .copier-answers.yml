@@ -1,15 +1,16 @@
 # Changes here will be overwritten by Copier
-_commit: 0.1.0
+_commit: 1.2.6
 _src_path: gh:pawamoy/copier-pdm
 author_email: dev@pawamoy.fr
-author_fullname: "Timoth\xE9e Mazzucotelli"
+author_fullname: Timothée Mazzucotelli
 author_username: pawamoy
 copyright_date: '2020'
-copyright_holder: "Timoth\xE9e Mazzucotelli"
+copyright_holder: Timothée Mazzucotelli
 copyright_holder_email: dev@pawamoy.fr
 copyright_license: ISC License
+insiders: false
 project_description: Visualize your usage of Bash/Zsh through a web app thanks to
-  Flask and Highcharts!
+    Flask and Highcharts!
 project_name: Shell History
 python_package_command_line_name: shellhistory
 python_package_distribution_name: shellhistory
@@ -17,3 +18,4 @@ python_package_import_name: shellhistory
 repository_name: shellhistory
 repository_namespace: pawamoy
 repository_provider: github.com
+

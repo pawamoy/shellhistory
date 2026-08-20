@@ -1,85 +1,22 @@
 # Shell History
 
-[% if repository_provider == "gitlab.com" -%]
-[![pipeline status](https://gitlab.com/[[ repository_namespace ]]/[[ repository_name ]]/badges/main/pipeline.svg)](https://gitlab.com/[[ repository_namespace ]]/[[ repository_name ]]/pipelines)
-[![coverage report](https://gitlab.com/[[ repository_namespace ]]/[[ repository_name ]]/badges/main/coverage.svg)](https://gitlab.com/[[ repository_namespace ]]/[[ repository_name ]]/commits/master)
-[% elif repository_provider == "github.com" -%]
-[![ci](https://github.com/[[ repository_namespace ]]/[[ repository_name ]]/workflows/ci/badge.svg)](https://github.com/[[ repository_namespace ]]/[[ repository_name ]]/actions?query=workflow%3Aci)
-[% endif -%]
-[![documentation](https://img.shields.io/badge/docs-mkdocs%20material-blue.svg?style=flat)](https://[[ repository_namespace ]].[[ repository_provider[:-4] ]].io/[[ repository_name ]]/)
-[![pypi version](https://img.shields.io/pypi/v/[[ repository_name ]].svg)](https://pypi.org/project/[[ repository_name ]]/)
-[![gitter](https://badges.gitter.im/join%20chat.svg)](https://gitter.im/[[ repository_name ]]/community)
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![ci](https://github.com/pawamoy/shellhistory/workflows/ci/badge.svg)](https://github.com/pawamoy/shellhistory/actions?query=workflow%3Aci)
+[![documentation](https://img.shields.io/badge/docs-mkdocs%20material-blue.svg?style=flat)](https://pawamoy.github.io/shellhistory/)
+[![pypi version](https://img.shields.io/pypi/v/shellhistory.svg)](https://pypi.org/project/shellhistory/)
+[![gitpod](https://img.shields.io/badge/gitpod-workspace-blue.svg?style=flat)](https://gitpod.io/#https://github.com/pawamoy/shellhistory)
+[![gitter](https://badges.gitter.im/join%20chat.svg)](https://app.gitter.im/#/room/#shellhistory:gitter.im)
 
-Inspired by [bamos/zsh-history-analysis](https://github.com/bamos/zsh-history-analysis).
-
-Visualize your usage of Bash/Zsh through a web app
-thanks to [Flask](http://flask.pocoo.org/) and [Highcharts](https://www.highcharts.com/)!
-
-<table>
-  <tr align="center">
-    <td>Duration<img alt="duration chart" src="pictures/duration.png" /></td>
-    <td>Length<img alt="length chart" src="pictures/length.png" /></td>
-    <td>Type<img alt="type chart" src="pictures/type.png" /></td>
-  </tr>
-  <tr align="center">
-    <td>Exit code<img alt="exit code chart" src="pictures/exit_code.png" /></td>
-    <td>Hourly<img alt="hourly chart" src="pictures/avg_hourly.png" /></td>
-    <td>Daily<img alt="daily chart" src="pictures/avg_daily.png" /></td>
-  </tr>
-  <tr align="center">
-    <td>Over time<img alt="over time chart" src="pictures/over_time.png" /></td>
-    <td>Markov chain<img alt="markov chart" src="pictures/markov.png" /></td>
-    <td>Top commands<img alt="top chart" src="pictures/top.png" /></td>
-  </tr>
-</table>
-
-<p align="center"><i>Post your charts ideas in <a href="https://github.com/pawamoy/shellhistory/issues/9">this issue</a>!</i></p>
-
-- [Requirements](#requirements)
-- [Installation](#installation)
-- [Setup](#setup)
-- [Usage](#usage)
-- [Some technical info](#some-technical-info)
-  - [How it works](#how-it-works)
-  - [Storage](#storage)
-  - [How we get the values](#how-we-get-the-values)
-- [License](#license)
-
-## Requirements
-
-Shell History requires Python 3.6 or above.
-
-<details>
-<summary>To install Python 3.6, I recommend using <a href="https://github.com/pyenv/pyenv"><code>pyenv</code></a>.</summary>
-
-```bash
-# install pyenv
-git clone https://github.com/pyenv/pyenv ~/.pyenv
-
-# setup pyenv (you should also put these three lines in .bashrc or similar)
-export PATH="${HOME}/.pyenv/bin:${PATH}"
-export PYENV_ROOT="${HOME}/.pyenv"
-eval "$(pyenv init -)"
-
-# install Python 3.6
-pyenv install 3.6.12
-
-# make it available globally
-pyenv global system 3.6.12
-```
-</details>
+Visualize your usage of Bash/Zsh through a web app thanks to Flask and Highcharts!
 
 ## Installation
 
 With `pip`:
+
 ```bash
-python3.6 -m pip install shellhistory
+pip install shellhistory
 ```
 
 With [`pipx`](https://github.com/pipxproject/pipx):
-```bash
-python3.6 -m pip install --user pipx
 
 pipx install --python python3.6 shellhistory
 ```

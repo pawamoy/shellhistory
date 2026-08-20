@@ -14,25 +14,25 @@ cd shellhistory
 make setup
 ```
 
-!!! note
-    If it fails for some reason,
-    you'll need to install
-    [Poetry](https://github.com/python-poetry/poetry)
-    manually.
-
-    You can install it with:
-
-    ```bash
-    python3 -m pip install --user pipx
-    pipx install poetry
-    ```
-
-    Now you can try running `make setup` again,
-    or simply `poetry install`.
+> NOTE:
+> If it fails for some reason,
+> you'll need to install
+> [PDM](https://github.com/pdm-project/pdm)
+> manually.
+>
+> You can install it with:
+>
+> ```bash
+> python3 -m pip install --user pipx
+> pipx install pdm
+> ```
+>
+> Now you can try running `make setup` again,
+> or simply `pdm install`.
 
 You now have the dependencies installed.
 
-You can run the application with `poetry run shellhistory [ARGS...]`.
+You can run the application with `pdm run shellhistory [ARGS...]`.
 
 Run `make help` to see all the available actions!
 
@@ -41,35 +41,30 @@ Run `make help` to see all the available actions!
 This project uses [duty](https://github.com/pawamoy/duty) to run tasks.
 A Makefile is also provided. The Makefile will try to run certain tasks
 on multiple Python versions. If for some reason you don't want to run the task
-on multiple Python versions, you can do one of the following:
-
-1. `export PYTHON_VERSIONS= `: this will run the task
-   with only the current Python version
-2. run the task directly with `poetry run duty TASK`,
-   or `duty TASK` if the environment was already activated
-   through `poetry shell`
+on multiple Python versions, you run the task directly with `pdm run duty TASK`.
 
 The Makefile detects if the Poetry environment is activated,
 so `make` will work the same with the virtualenv activated or not.
+
+If you work in VSCode, we provide
+[an action to configure VSCode](https://pawamoy.github.io/copier-pdm/work/#vscode-setup)
+for the project.
 
 ## Development
 
 As usual:
 
-1. create a new branch: `git checkout -b feature-or-bugfix-name`
+1. create a new branch: `git switch -c feature-or-bugfix-name`
 1. edit the code and/or the documentation
-
-If you updated the documentation or the project dependencies:
-
-1. run `make docs-regen`
-1. run `make docs-serve`,
-   go to http://localhost:8000 and check that everything looks good
 
 **Before committing:**
 
 1. run `make format` to auto-format the code
 1. run `make check` to check everything (fix any warning)
 1. run `make test` to run the tests (fix any issue)
+1. if you updated the documentation or the project dependencies:
+    1. run `make docs`
+    1. go to http://localhost:8000 and check that everything looks good
 1. follow our [commit message convention](#commit-message-convention)
 
 If you are unsure about how to fix or ignore a warning,
@@ -80,8 +75,9 @@ Don't bother updating the changelog, we will take care of this.
 
 ## Commit message convention
 
-Commits messages must follow the
-[Angular style](https://gist.github.com/stephenparish/9941e89d80e2bc58a153#format-of-the-commit-message):
+Commit messages must follow our convention based on the
+[Angular style](https://gist.github.com/stephenparish/9941e89d80e2bc58a153#format-of-the-commit-message)
+or the [Karma convention](https://karma-runner.github.io/4.0/dev/git-commit-msg.html):
 
 ```
 <type>[(scope)]: Subject
@@ -89,34 +85,52 @@ Commits messages must follow the
 [Body]
 ```
 
+**Subject and body must be valid Markdown.**
+Subject must have proper casing (uppercase for first letter
+if it makes sense), but no dot at the end, and no punctuation
+in general.
+
 Scope and body are optional. Type can be:
 
 - `build`: About packaging, building wheels, etc.
 - `chore`: About packaging or repo/files management.
 - `ci`: About Continuous Integration.
+- `deps`: Dependencies update.
 - `docs`: About documentation.
 - `feat`: New feature.
 - `fix`: Bug fix.
 - `perf`: About performance.
-- `refactor`: Changes which are not features nor bug fixes.
+- `refactor`: Changes that are not features or bug fixes.
 - `style`: A change in code style/format.
 - `tests`: About tests.
 
-**Subject (and body) must be valid Markdown.**
-If you write a body, please add issues references at the end:
+If you write a body, please add trailers at the end
+(for example issues and PR references, or co-authors),
+without relying on GitHub's flavored Markdown:
 
 ```
 Body.
 
-References: #10, #11.
-Fixes #15.
+Issue #10: https://github.com/namespace/project/issues/10
+Related to PR namespace/other-project#15: https://github.com/namespace/other-project/pull/15
 ```
+
+These "trailers" must appear at the end of the body,
+without any blank lines between them. The trailer title
+can contain any character except colons `:`.
+We expect a full URI for each trailer, not just GitHub autolinks
+(for example, full GitHub URLs for commits and issues,
+not the hash or the #issue-number).
+
+We do not enforce a line length on commit messages summary and body,
+but please avoid very long summaries, and very long lines in the body,
+unless they are part of code blocks that must not be wrapped.
 
 ## Pull requests guidelines
 
 Link to any related issue in the Pull Request message.
 
-During review, we recommend using fixups:
+During the review, we recommend using fixups:
 
 ```bash
 # SHA is the SHA of the commit you want to fix
@@ -126,7 +140,7 @@ git commit --fixup=SHA
 Once all the changes are approved, you can squash your commits:
 
 ```bash
-git rebase -i --autosquash master
+git rebase -i --autosquash main
 ```
 
 And force-push:
