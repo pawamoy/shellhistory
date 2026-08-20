@@ -11,6 +11,24 @@
 #
 # They assign to variables rather than writing to stdout on purpose: capturing
 # output with $(...) forks a subshell, and these run on every single prompt.
+#
+# Finished records go straight into the SQLite database, written by record.py in
+# a detached background process so the prompt never waits on it. Values are
+# passed as separate arguments and bound as query parameters, so nothing in a
+# command line can be mistaken for anything else -- which is also why none of
+# them need encoding any more.
+
+# LOCATING OURSELVES -----------------------------------------------------------
+# Must happen while the file is being sourced: $0 and BASH_SOURCE mean something
+# else once we are inside a function.
+
+if [ -n "${ZSH_VERSION}" ]; then
+  _SHELLHISTORY_DIR="${${(%):-%x}:A:h}"
+elif [ -n "${BASH_VERSION}" ]; then
+  _SHELLHISTORY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+fi
+_SHELLHISTORY_RECORDER="${SHELLHISTORY_RECORDER:-${_SHELLHISTORY_DIR}/record.py}"
+_SHELLHISTORY_PYTHON="${SHELLHISTORY_PYTHON:-python3}"
 
 # SHELL-SPECIFIC IMPLEMENTATIONS -----------------------------------------------
 
@@ -91,6 +109,12 @@ if [ -n "${ZSH_VERSION}" ]; then
     }
   fi
 
+  # `&!` backgrounds and disowns in one step, so the writer survives the shell
+  # exiting and never appears in the job table.
+  _shellhistory_spawn() {
+    "$@" >/dev/null 2>&1 </dev/null &!
+  }
+
   # In zsh, preexec fires exactly once per command line, so the
   # _SHELLHISTORY_BEFORE_DONE flag alone guarantees one record per prompt cycle.
   # The $HISTCMD comparison Bash needs is not just redundant here, it is harmful:
@@ -137,6 +161,11 @@ elif [ -n "${BASH_VERSION}" ]; then
 
   _shellhistory_last_command_number() {
     fc -lr -0 | head -n1 | cut -f1
+  }
+
+  _shellhistory_spawn() {
+    "$@" >/dev/null 2>&1 </dev/null &
+    disown 2>/dev/null
   }
 
   # The DEBUG trap fires for every command of a pipeline or list, so Bash does
@@ -186,12 +215,10 @@ if ! command -v _shellhistory_is_private >/dev/null 2>&1; then
   _shellhistory_is_private() { return 1; }
 fi
 
-# GNU coreutils understands -w0; BSD/macOS base64 does not and would fail on
-# every single command, leaving the path and parents columns empty.
-if printf '' | base64 -w0 >/dev/null 2>&1; then
-  _shellhistory_b64() { base64 -w0; }
-else
-  _shellhistory_b64() { base64 | tr -d '\n'; }
+if ! command -v _shellhistory_spawn >/dev/null 2>&1; then
+  _shellhistory_spawn() {
+    ( "$@" >/dev/null 2>&1 </dev/null & ) >/dev/null 2>&1
+  }
 fi
 
 # HELPERS ----------------------------------------------------------------------
@@ -242,6 +269,36 @@ else
   }
 fi
 
+# $HOST (zsh) and $HOSTNAME (bash) are already set; /etc/hostname covers the
+# rest. Only `hostname` needs a process, so try it last.
+_shellhistory_hostname() {
+  if [ -n "${HOST}" ]; then
+    printf '%s' "${HOST}"
+  elif [ -n "${HOSTNAME}" ]; then
+    printf '%s' "${HOSTNAME}"
+  elif [ -r /etc/hostname ]; then
+    while IFS= read -r line; do
+      printf '%s' "${line}"
+      break
+    done < /etc/hostname
+  else
+    hostname
+  fi
+}
+
+# The kernel hands out uuids through procfs, so `uuidgen` need not be installed
+# (and need not be started).
+_shellhistory_uuid() {
+  if [ -r /proc/sys/kernel/random/uuid ]; then
+    while IFS= read -r line; do
+      printf '%s' "${line}"
+      break
+    done < /proc/sys/kernel/random/uuid
+  else
+    uuidgen
+  fi
+}
+
 # The absolute path of the *running* shell. $SHELL is the user's login shell
 # preference, so it reports "/bin/bash" for every command typed into a zsh
 # started from a bash terminal, from tmux, or from a container.
@@ -277,42 +334,34 @@ _shellhistory_set_code() {
   _SHELLHISTORY_CODE=$?
 }
 
-# The working directory rarely changes between two commands, so cache the
-# encoding and skip the base64 fork on the vast majority of prompts.
 _shellhistory_set_pwd() {
-  [ "${_SHELLHISTORY_PWD}" = "${PWD}" ] && return 0
   _SHELLHISTORY_PWD="${PWD}"
-  _SHELLHISTORY_PWD_B64="$(printf '%s' "${PWD}" | _shellhistory_b64)"
 }
 
 _shellhistory_append() {
   if _shellhistory_can_append; then
-    _shellhistory_append_to_file
+    _shellhistory_record
   fi
 }
 
-_shellhistory_append_to_file() {
-  local nl cmd
-  nl='
-'
-  # Continuation lines of a multi-line command are prefixed with ';' so the
-  # parser can tell them apart from the ':'-prefixed record header. Done here
-  # with a parameter expansion instead of piping through sed: no fork.
-  cmd="${_SHELLHISTORY_COMMAND//${nl}/${nl};}"
-  printf ':%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s\n' \
+# Hand the record to record.py and return immediately: the prompt must never
+# wait on a database write.
+_shellhistory_record() {
+  _shellhistory_spawn \
+    "${_SHELLHISTORY_PYTHON}" "${_SHELLHISTORY_RECORDER}" \
     "${_SHELLHISTORY_START_TIME}" \
     "${_SHELLHISTORY_STOP_TIME}" \
     "${_SHELLHISTORY_UUID}" \
-    "${_SHELLHISTORY_PARENTS_B64}" \
     "${_SHELLHISTORY_HOSTNAME}" \
     "${USER}" \
     "${_SHELLHISTORY_TTY}" \
-    "${_SHELLHISTORY_PWD_B64}" \
+    "${_SHELLHISTORY_PARENTS}" \
     "${_SHELLHISTORY_SHELL}" \
     "${SHLVL}" \
     "${_SHELLHISTORY_TYPE}" \
     "${_SHELLHISTORY_CODE}" \
-    "${cmd}" >> "${SHELLHISTORY_FILE}"
+    "${_SHELLHISTORY_PWD}" \
+    "${_SHELLHISTORY_COMMAND}"
 }
 
 _shellhistory_before() {
@@ -418,11 +467,9 @@ _shellhistory_help() {
 # GLOBAL VARIABLES -------------------------------------------------------------
 _SHELLHISTORY_CODE=0
 _SHELLHISTORY_COMMAND=
-_SHELLHISTORY_HOSTNAME="$(hostname)"
+_SHELLHISTORY_HOSTNAME="$(_shellhistory_hostname)"
 _SHELLHISTORY_PARENTS="$(_shellhistory_parents)"
-_SHELLHISTORY_PARENTS_B64="$(printf '%s' "${_SHELLHISTORY_PARENTS}" | _shellhistory_b64)"
 _SHELLHISTORY_PWD=
-_SHELLHISTORY_PWD_B64=
 _SHELLHISTORY_SHELL="$(_shellhistory_detect_shell)"
 _SHELLHISTORY_START_TIME=
 _SHELLHISTORY_STOP_TIME=
@@ -430,7 +477,7 @@ _SHELLHISTORY_TTY="$(tty)"
 _SHELLHISTORY_TYPE=
 _SHELLHISTORY_NOW=
 _SHELLHISTORY_WORD=
-_SHELLHISTORY_UUID="${_SHELLHISTORY_UUID:-$(uuidgen)}"
+_SHELLHISTORY_UUID="${_SHELLHISTORY_UUID:-$(_shellhistory_uuid)}"
 
 _SHELLHISTORY_AFTER_DONE=0
 _SHELLHISTORY_BEFORE_DONE=0
@@ -438,9 +485,9 @@ _SHELLHISTORY_ENABLED=0
 _SHELLHISTORY_PRIVATE=0
 _SHELLHISTORY_PREVCMD_NUM=
 
-SHELLHISTORY_FILE="${SHELLHISTORY_FILE:-$HOME/.shellhistory/history}"
+SHELLHISTORY_DB="${SHELLHISTORY_DB:-$HOME/.shellhistory/db.sqlite3}"
 
-export SHELLHISTORY_FILE
+export SHELLHISTORY_DB
 export _SHELLHISTORY_UUID
 
 # MAIN COMMAND -----------------------------------------------------------------
