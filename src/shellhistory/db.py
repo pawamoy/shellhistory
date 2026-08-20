@@ -48,10 +48,6 @@ def create_tables():
     Base.metadata.create_all(engine)
 
 
-if not DB_PATH.exists():
-    create_tables()
-
-
 Session = scoped_session(sessionmaker(bind=engine))
 
 
@@ -113,6 +109,12 @@ class History(Base):
     @staticmethod
     def from_line(line):
         return History.tuple_to_db_object(History.line_to_tuple(line))
+
+
+# Must run *after* History is declared, otherwise Base.metadata is still empty
+# and create_all() silently creates a database without any table in it.
+# create_all() is idempotent (checkfirst=True), so it is safe on every import.
+create_tables()
 
 
 def flush():
