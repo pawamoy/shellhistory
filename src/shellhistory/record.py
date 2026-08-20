@@ -21,8 +21,19 @@ import sys
 from datetime import datetime
 
 FIELDS = (
-    "start", "stop", "uuid", "host", "user", "tty", "parents",
-    "shell", "level", "type", "code", "path", "cmd",
+    "start",
+    "stop",
+    "uuid",
+    "host",
+    "user",
+    "tty",
+    "parents",
+    "shell",
+    "level",
+    "type",
+    "code",
+    "path",
+    "cmd",
 )
 
 # Must stay in step with the models in db.py; tests/test_record.py compares the
@@ -61,7 +72,9 @@ CREATE INDEX IF NOT EXISTS ix_history_start ON history (start);
 
 def default_db_path():
     return os.environ.get("SHELLHISTORY_DB") or os.path.join(
-        os.path.expanduser("~"), ".shellhistory", "db.sqlite3",
+        os.path.expanduser("~"),
+        ".shellhistory",
+        "db.sqlite3",
     )
 
 
@@ -90,8 +103,15 @@ def connect(db_path):
 
 def session_id(connection, values):
     """Get, or create, the row describing the shell this command ran in."""
-    key = (values["uuid"], values["host"], values["user"], values["tty"],
-           values["shell"], to_int(values["level"]), values["parents"])
+    key = (
+        values["uuid"],
+        values["host"],
+        values["user"],
+        values["tty"],
+        values["shell"],
+        to_int(values["level"]),
+        values["parents"],
+    )
     connection.execute(
         "INSERT OR IGNORE INTO sessions (uuid, host, user, tty, shell, level, parents) VALUES (?,?,?,?,?,?,?)",
         key,

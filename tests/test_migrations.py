@@ -36,21 +36,36 @@ def make_legacy(path, rows):
 
 def legacy_row(row_id, start, uuid="u1", level=2, cmd="echo hello"):
     return (
-        row_id, start, start, "1970-01-01 00:00:00.001000",
-        "corsair", "pawamoy", uuid, "/dev/pts/3", PARENTS,
-        "/usr/bin/zsh", level, "builtin", 0, "/home/pawamoy", cmd,
+        row_id,
+        start,
+        start,
+        "1970-01-01 00:00:00.001000",
+        "corsair",
+        "pawamoy",
+        uuid,
+        "/dev/pts/3",
+        PARENTS,
+        "/usr/bin/zsh",
+        level,
+        "builtin",
+        0,
+        "/home/pawamoy",
+        cmd,
     )
 
 
-@pytest.fixture()
+@pytest.fixture
 def legacy_db(tmp_path, monkeypatch):
     path = tmp_path / "db.sqlite3"
-    make_legacy(path, [
-        legacy_row(1, "2026-01-01 10:00:00.000000"),
-        legacy_row(2, "2026-01-01 10:00:01.000000"),
-        legacy_row(3, "2026-01-01 10:00:02.000000", level=3),
-        legacy_row(4, "2026-01-01 10:00:03.000000", uuid="u2"),
-    ])
+    make_legacy(
+        path,
+        [
+            legacy_row(1, "2026-01-01 10:00:00.000000"),
+            legacy_row(2, "2026-01-01 10:00:01.000000"),
+            legacy_row(3, "2026-01-01 10:00:02.000000", level=3),
+            legacy_row(4, "2026-01-01 10:00:03.000000", uuid="u2"),
+        ],
+    )
     return path
 
 
@@ -132,15 +147,19 @@ def test_legacy_text_import(tmp_path, monkeypatch):
     parents_b64 = b64encode(PARENTS.encode()).decode()
     path_b64 = b64encode(b"/home/pawamoy").decode()
     path.write_text(
-        ":1787000000000000:1787000000123456:u1:{p}:corsair:pawamoy:/dev/pts/3:{d}"
+        f":1787000000000000:1787000000123456:u1:{parents_b64}:corsair:pawamoy:/dev/pts/3:{path_b64}"
         ":/usr/bin/zsh:2:builtin:0:echo one\n"
-        ";echo two\n".format(p=parents_b64, d=path_b64),
+        ";echo two\n",
     )
 
     code = subprocess.run(
-        [sys.executable, "-c",
-         "from shellhistory import migrations; r = migrations.import_file(%r); print(r.inserted)" % str(path)],
-        capture_output=True, text=True,
+        [
+            sys.executable,
+            "-c",
+            "from shellhistory import migrations; r = migrations.import_file(%r); print(r.inserted)" % str(path),
+        ],
+        capture_output=True,
+        text=True,
     )
     assert code.returncode == 0, code.stderr
     assert code.stdout.strip().endswith("1")
@@ -152,7 +171,7 @@ def test_legacy_text_import(tmp_path, monkeypatch):
         ).fetchone()
     finally:
         connection.close()
-    assert row[0] == PARENTS          # base64 decoded
+    assert row[0] == PARENTS  # base64 decoded
     assert row[1] == "/home/pawamoy"  # base64 decoded
     assert row[2] == "echo one\necho two"  # ';' continuation rejoined
 

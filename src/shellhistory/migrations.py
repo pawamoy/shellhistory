@@ -166,9 +166,7 @@ CREATE INDEX ix_history_session_id ON history (session_id);
 CREATE INDEX ix_history_start ON history (start);
 """
 
-INSERT_HISTORY = (
-    "INSERT INTO history (id, session_id, start, stop, type, code, path, cmd) VALUES (?,?,?,?,?,?,?,?)"
-)
+INSERT_HISTORY = "INSERT INTO history (id, session_id, start, stop, type, code, path, cmd) VALUES (?,?,?,?,?,?,?,?)"
 
 LEGACY_COLUMNS = "id, start, stop, host, user, uuid, tty, parents, shell, level, type, code, path, cmd"
 
@@ -216,7 +214,7 @@ def migrate_schema(db_path=None, backup=True, verify=True, progress=True):
     stream = tqdm(rows, total=total, unit="rows") if progress else rows
 
     batch = []
-    for (row_id, start, stop, host, user, uuid, tty, parents, shell, level, type_, code, path, cmd) in stream:
+    for row_id, start, stop, host, user, uuid, tty, parents, shell, level, type_, code, path, cmd in stream:
         key = (uuid, host, user, tty, shell, level, parents)
         session_id = session_ids.get(key)
         if session_id is None:

@@ -28,7 +28,7 @@ def schema_of(path):
         connection.close()
 
 
-@pytest.fixture()
+@pytest.fixture
 def db_path(tmp_path):
     return str(tmp_path / "db.sqlite3")
 
@@ -125,8 +125,7 @@ def test_schema_matches_the_sqlalchemy_models(db_path, tmp_path):
 
     from_models = str(tmp_path / "models.sqlite3")
     subprocess.run(
-        [sys.executable, "-c",
-         "from shellhistory import db; db.create_tables()"],
+        [sys.executable, "-c", "from shellhistory import db; db.create_tables()"],
         env={**os.environ, "SHELLHISTORY_DB": from_models, "SHELLHISTORY_FILE": os.devnull},
         check=True,
     )
@@ -140,10 +139,26 @@ def test_a_broken_database_parks_the_record_instead_of_losing_it(tmp_path, monke
     unwritable.write_text("this is not a database")
     monkeypatch.setattr(record, "default_db_path", lambda: str(unwritable))
 
-    assert record.main([
-        "1787000000000000", "1787000000123456", "uuid-1", "corsair", "pawamoy",
-        "/dev/pts/3", "parents", "/usr/bin/zsh", "2", "builtin", "0", "/tmp", "echo hi",
-    ]) == 1
+    assert (
+        record.main(
+            [
+                "1787000000000000",
+                "1787000000123456",
+                "uuid-1",
+                "corsair",
+                "pawamoy",
+                "/dev/pts/3",
+                "parents",
+                "/usr/bin/zsh",
+                "2",
+                "builtin",
+                "0",
+                "/tmp",
+                "echo hi",
+            ]
+        )
+        == 1
+    )
     parked = tmp_path / "unrecorded.jsonl"
     assert parked.exists()
     assert "echo hi" in parked.read_text()

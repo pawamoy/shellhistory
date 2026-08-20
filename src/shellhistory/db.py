@@ -11,7 +11,6 @@ the database file on its own.
 """
 
 import os
-from datetime import datetime
 from pathlib import Path
 
 from sqlalchemy import (
@@ -170,10 +169,15 @@ class SessionCache:
         )
         if row is None:
             row = ShellSession(
-                uuid=uuid, host=host, user=user, tty=tty, shell=shell, level=level, parents=parents,
+                uuid=uuid,
+                host=host,
+                user=user,
+                tty=tty,
+                shell=shell,
+                level=level,
+                parents=parents,
             )
             self.sqla_session.add(row)
             self.sqla_session.flush()
         self._ids[key] = row.id
         return row.id
-

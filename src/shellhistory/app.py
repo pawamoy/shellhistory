@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 import statistics
 import time
 from collections import Counter, defaultdict
@@ -34,9 +32,19 @@ class HistoryModelView(ModelView):
     # command ran in, so they are reached through the relationship rather than
     # repeated on every row.
     column_list = [
-        "id", "start", "stop", "type", "code", "path", "cmd",
-        "session.host", "session.user", "session.uuid", "session.tty",
-        "session.shell", "session.level",
+        "id",
+        "start",
+        "stop",
+        "type",
+        "code",
+        "path",
+        "cmd",
+        "session.host",
+        "session.user",
+        "session.uuid",
+        "session.tty",
+        "session.shell",
+        "session.level",
     ]
     column_searchable_list = [
         "type",
@@ -50,9 +58,18 @@ class HistoryModelView(ModelView):
         "session.shell",
     ]
     column_filters = [
-        "start", "type", "code", "path", "cmd",
-        "session.host", "session.user", "session.uuid", "session.tty",
-        "session.shell", "session.level", "session.parents",
+        "start",
+        "type",
+        "code",
+        "path",
+        "cmd",
+        "session.host",
+        "session.user",
+        "session.uuid",
+        "session.tty",
+        "session.shell",
+        "session.level",
+        "session.parents",
     ]
     # Only the command's own columns are editable in place: a session row is
     # shared by every command that ran in that shell, so editing it here would
@@ -236,7 +253,7 @@ def daily_json():
     session = db.Session()
     results = defaultdict(int)
     results.update(
-        session.query(func.strftime("%w", db.History.start).label("day"), func.count("day")).group_by("day").all()
+        session.query(func.strftime("%w", db.History.start).label("day"), func.count("day")).group_by("day").all(),
     )
     data = [results[str(day)] for day in range(1, 7)]
     # put sunday at the end
@@ -252,7 +269,7 @@ def daily_average_json():
     number_of_weeks = (maxtime - mintime).days / 7 + 1
     results = defaultdict(int)
     results.update(
-        session.query(func.strftime("%w", db.History.start).label("day"), func.count("day")).group_by("day").all()
+        session.query(func.strftime("%w", db.History.start).label("day"), func.count("day")).group_by("day").all(),
     )
     data = [float("%.2f" % (results[str(day)] / number_of_weeks)) for day in range(1, 7)]
     # put sunday at the end
@@ -286,9 +303,9 @@ def hourly_json():
     session = db.Session()
     results = defaultdict(lambda: 0)
     results.update(
-        session.query(extract("hour", db.History.start).label("hour"), func.count("hour")).group_by("hour").all()
+        session.query(extract("hour", db.History.start).label("hour"), func.count("hour")).group_by("hour").all(),
     )
-    data = [results[hour] for hour in range(0, 24)]
+    data = [results[hour] for hour in range(24)]
     return jsonify(data)
 
 
@@ -300,9 +317,9 @@ def hourly_average_json():
     number_of_days = (maxtime - mintime).days + 1
     results = defaultdict(lambda: 0)
     results.update(
-        session.query(extract("hour", db.History.start).label("hour"), func.count("hour")).group_by("hour").all()
+        session.query(extract("hour", db.History.start).label("hour"), func.count("hour")).group_by("hour").all(),
     )
-    data = [float("%.2f" % (results[hour] / number_of_days)) for hour in range(0, 24)]
+    data = [float("%.2f" % (results[hour] / number_of_days)) for hour in range(24)]
     return jsonify(data)
 
 
@@ -311,7 +328,7 @@ def length_json():
     session = db.Session()
     results = defaultdict(lambda: 0)
     results.update(
-        session.query(func.char_length(db.History.cmd).label("length"), func.count("length")).group_by("length").all()
+        session.query(func.char_length(db.History.cmd).label("length"), func.count("length")).group_by("length").all(),
     )
 
     if not results:
@@ -380,7 +397,7 @@ def monthly_json():
     session = db.Session()
     results = defaultdict(lambda: 0)
     results.update(
-        session.query(extract("month", db.History.start).label("month"), func.count("month")).group_by("month").all()
+        session.query(extract("month", db.History.start).label("month"), func.count("month")).group_by("month").all(),
     )
     data = [results[month] for month in range(1, 13)]
     return jsonify(data)
@@ -394,7 +411,7 @@ def monthly_average_json():
     number_of_years = fractional_year(mintime, maxtime) + 1
     results = defaultdict(lambda: 0)
     results.update(
-        session.query(extract("month", db.History.start).label("month"), func.count("month")).group_by("month").all()
+        session.query(extract("month", db.History.start).label("month"), func.count("month")).group_by("month").all(),
     )
     data = [float("%.2f" % (results[month] / number_of_years)) for month in range(1, 13)]
     return jsonify(data)
@@ -492,7 +509,7 @@ def yearly_json():
     maxyear = session.query(extract("year", func.max(db.History.start))).first()[0]
     results = defaultdict(lambda: 0)
     results.update(
-        session.query(extract("year", db.History.start).label("year"), func.count("year")).group_by("year").all()
+        session.query(extract("year", db.History.start).label("year"), func.count("year")).group_by("year").all(),
     )
     data = [(year, results[year]) for year in range(minyear, maxyear + 1)]
     return jsonify(data)
