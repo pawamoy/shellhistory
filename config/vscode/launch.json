@@ -7,7 +7,27 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
-            "justMyCode": false
+            "justMyCode": false,
+            "args": "${command:pickArgs}"
+        },
+        {
+            "name": "run",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "shellhistory",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": "${command:pickArgs}"
+        },
+        {
+            "name": "docs",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "zensical",
+            "justMyCode": false,
+            "args": [
+                "serve",
+            ]
         },
         {
             "name": "test",

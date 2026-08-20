@@ -1,54 +1,30 @@
 # Contributing
 
-Contributions are welcome, and they are greatly appreciated!
-Every little bit helps, and credit will always be given.
+Contributions are welcome, and they are greatly appreciated. Every little bit helps, and credit will always be given.
+
+**Please always create an issue before working on a new feature or a bug fix, so that we can discuss the implementation and make sure that your work will be merged.**
 
 ## Environment setup
 
-Nothing easier!
-
-Fork and clone the repository, then:
+Install [uv](https://github.com/astral-sh/uv) and [direnv](https://direnv.net/), fork and clone the repository, then:
 
 ```bash
 cd shellhistory
+direnv allow
 make setup
 ```
 
-> NOTE:
-> If it fails for some reason,
-> you'll need to install
-> [PDM](https://github.com/pdm-project/pdm)
-> manually.
->
-> You can install it with:
->
-> ```bash
-> python3 -m pip install --user pipx
-> pipx install pdm
-> ```
->
-> Now you can try running `make setup` again,
-> or simply `pdm install`.
-
 You now have the dependencies installed.
 
-You can run the application with `pdm run shellhistory [ARGS...]`.
+You can run the application with `make run shellhistory [ARGS...]`.
 
 Run `make help` to see all the available actions!
 
 ## Tasks
 
-This project uses [duty](https://github.com/pawamoy/duty) to run tasks.
-A Makefile is also provided. The Makefile will try to run certain tasks
-on multiple Python versions. If for some reason you don't want to run the task
-on multiple Python versions, you run the task directly with `pdm run duty TASK`.
+The entry-point to run commands and tasks is the `make` Python script, located in the `scripts` directory. Try running `make` to show the available commands and tasks. The *commands* do not need the Python dependencies to be installed, while the *tasks* do. The cross-platform tasks are written in Python, thanks to [duty](https://github.com/pawamoy/duty).
 
-The Makefile detects if the Poetry environment is activated,
-so `make` will work the same with the virtualenv activated or not.
-
-If you work in VSCode, we provide
-[an action to configure VSCode](https://pawamoy.github.io/copier-pdm/work/#vscode-setup)
-for the project.
+If you work in VSCode, we provide [an action to configure VSCode](https://pawamoy.github.io/copier-uv/work/#vscode-setup) for the project.
 
 ## Development
 
@@ -67,17 +43,13 @@ As usual:
     1. go to http://localhost:8000 and check that everything looks good
 1. follow our [commit message convention](#commit-message-convention)
 
-If you are unsure about how to fix or ignore a warning,
-just let the continuous integration fail,
-and we will help you during review.
+If you are unsure about how to fix or ignore a warning, just let the continuous integration fail, and we will help you during review.
 
 Don't bother updating the changelog, we will take care of this.
 
 ## Commit message convention
 
-Commit messages must follow our convention based on the
-[Angular style](https://gist.github.com/stephenparish/9941e89d80e2bc58a153#format-of-the-commit-message)
-or the [Karma convention](https://karma-runner.github.io/4.0/dev/git-commit-msg.html):
+Commit messages must follow our convention based on the [Angular style](https://gist.github.com/stephenparish/9941e89d80e2bc58a153#format-of-the-commit-message) or the [Karma convention](https://karma-runner.github.io/4.0/dev/git-commit-msg.html):
 
 ```
 <type>[(scope)]: Subject
@@ -85,10 +57,7 @@ or the [Karma convention](https://karma-runner.github.io/4.0/dev/git-commit-msg.
 [Body]
 ```
 
-**Subject and body must be valid Markdown.**
-Subject must have proper casing (uppercase for first letter
-if it makes sense), but no dot at the end, and no punctuation
-in general.
+**Subject and body must be valid Markdown.** Subject must have proper casing (uppercase for first letter if it makes sense), but no dot at the end, and no punctuation in general.
 
 Scope and body are optional. Type can be:
 
@@ -104,9 +73,7 @@ Scope and body are optional. Type can be:
 - `style`: A change in code style/format.
 - `tests`: About tests.
 
-If you write a body, please add trailers at the end
-(for example issues and PR references, or co-authors),
-without relying on GitHub's flavored Markdown:
+If you write a body, please add trailers at the end (for example issues and PR references, or co-authors), without relying on GitHub's flavored Markdown:
 
 ```
 Body.
@@ -115,16 +82,9 @@ Issue #10: https://github.com/namespace/project/issues/10
 Related to PR namespace/other-project#15: https://github.com/namespace/other-project/pull/15
 ```
 
-These "trailers" must appear at the end of the body,
-without any blank lines between them. The trailer title
-can contain any character except colons `:`.
-We expect a full URI for each trailer, not just GitHub autolinks
-(for example, full GitHub URLs for commits and issues,
-not the hash or the #issue-number).
+These "trailers" must appear at the end of the body, without any blank lines between them. The trailer title can contain any character except colons `:`. We expect a full URI for each trailer, not just GitHub autolinks (for example, full GitHub URLs for commits and issues, not the hash or the #issue-number).
 
-We do not enforce a line length on commit messages summary and body,
-but please avoid very long summaries, and very long lines in the body,
-unless they are part of code blocks that must not be wrapped.
+We do not enforce a line length on commit messages summary and body, but please avoid very long summaries, and very long lines in the body, unless they are part of code blocks that must not be wrapped.
 
 ## Pull requests guidelines
 
@@ -149,5 +109,4 @@ And force-push:
 git push -f
 ```
 
-If this seems all too complicated, you can push or force-push each new commit,
-and we will squash them ourselves if needed, before merging.
+If this seems all too complicated, you can push or force-push each new commit, and we will squash them ourselves if needed, before merging.

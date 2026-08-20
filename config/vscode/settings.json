@@ -1,43 +1,22 @@
 {
     "files.watcherExclude": {
-        "**/__pypackages__/**": true,
         "**/.venv*/**": true,
+        "**/.venvs*/**": true,
         "**/venv*/**": true
     },
-    "[python]": {
-        "editor.defaultFormatter": "ms-python.black-formatter"
-    },
-    "python.autoComplete.extraPaths": [
-        "__pypackages__/3.8/lib",
-        "__pypackages__/3.9/lib",
-        "__pypackages__/3.10/lib",
-        "__pypackages__/3.11/lib",
-        "__pypackages__/3.12/lib"
-    ],
-    "python.analysis.extraPaths": [
-        "__pypackages__/3.8/lib",
-        "__pypackages__/3.9/lib",
-        "__pypackages__/3.10/lib",
-        "__pypackages__/3.11/lib",
-        "__pypackages__/3.12/lib"
-    ],
-    "black-formatter.args": [
-        "--config=config/black.toml"
-    ],
-    "mypy-type-checker.args": [
-        "--config-file=config/mypy.ini"
-    ],
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true,
     "python.testing.pytestArgs": [
         "--config-file=config/pytest.ini"
     ],
+    "ruff.enable": true,
     "ruff.format.args": [
         "--config=config/ruff.toml"
     ],
     "ruff.lint.args": [
         "--config=config/ruff.toml"
     ],
+    "ty.configurationFile": "config/ty.toml",
     "yaml.schemas": {
         "https://squidfunk.github.io/mkdocs-material/schema.json": "mkdocs.yml"
     },

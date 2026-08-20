@@ -1,22 +1,19 @@
 # Shell History
 
 [![ci](https://github.com/pawamoy/shellhistory/workflows/ci/badge.svg)](https://github.com/pawamoy/shellhistory/actions?query=workflow%3Aci)
-[![documentation](https://img.shields.io/badge/docs-mkdocs%20material-blue.svg?style=flat)](https://pawamoy.github.io/shellhistory/)
+[![documentation](https://img.shields.io/badge/docs-zensical-FF9100.svg?style=flat)](https://pawamoy.github.io/shellhistory/)
 [![pypi version](https://img.shields.io/pypi/v/shellhistory.svg)](https://pypi.org/project/shellhistory/)
-[![gitpod](https://img.shields.io/badge/gitpod-workspace-blue.svg?style=flat)](https://gitpod.io/#https://github.com/pawamoy/shellhistory)
-[![gitter](https://badges.gitter.im/join%20chat.svg)](https://app.gitter.im/#/room/#shellhistory:gitter.im)
+[![gitter](https://img.shields.io/badge/matrix-chat-4DB798.svg?style=flat)](https://app.gitter.im/#/room/#shellhistory:gitter.im)
 
 Visualize your usage of Bash/Zsh through a web app thanks to Flask and Highcharts!
 
 ## Installation
 
-With `pip`:
-
 ```bash
 pip install shellhistory
 ```
 
-With [`pipx`](https://github.com/pipxproject/pipx):
+With [`uv`](https://docs.astral.sh/uv/):
 
 pipx install --python python3.6 shellhistory
 ```

@@ -6,9 +6,10 @@ build-backend = "pdm.backend"
 name = "shellhistory"
 description = "Visualize your usage of Bash/Zsh through a web app thanks to Flask and Highcharts!"
 authors = [{name = "Timothée Mazzucotelli", email = "dev@pawamoy.fr"}]
-license = {text = "ISC"}
+license = "ISC"
+license-files = ["LICENSE"]
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 keywords = []
 dynamic = ["version"]
 classifiers = [
@@ -17,11 +18,11 @@ classifiers = [
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Documentation",
     "Topic :: Software Development",
     "Topic :: Utilities",
@@ -40,55 +41,63 @@ Gitter = "https://gitter.im/shellhistory/community"
 Funding = "https://github.com/sponsors/pawamoy"
 
 [project.scripts]
-shellhistory = "shellhistory.cli:main"
+shellhistory = "shellhistory:main"
 
-[tool.pdm]
-version = {source = "scm"}
-plugins = [
-    "pdm-multirun",
-]
+[tool.pdm.version]
+source = "call"
+getter = "scripts.get_version:get_version"
 
 [tool.pdm.build]
-package-dir = "src"
-editable-backend = "editables"
+# Include as much as possible in the source distribution, to help redistributors.
+excludes = ["**/.pytest_cache"]
+source-includes = [
+    "config",
+    "docs",
+    "scripts",
+    "share",
+    "tests",
+    "duties.py",
+    "zensical.toml",
+    "*.md",
+    "LICENSE",
+]
 
-[tool.pdm.dev-dependencies]
-duty = ["duty>=0.10"]
-ci-quality = ["shellhistory[duty,docs,quality,typing,security]"]
-ci-tests = ["shellhistory[duty,tests]"]
-docs = [
-    "black>=23.9",
-    "markdown-callouts>=0.3",
-    "markdown-exec>=1.7",
-    "mkdocs>=1.5",
-    "mkdocs-coverage>=1.0",
-    "mkdocs-gen-files>=0.5",
-    "mkdocs-git-committers-plugin-2>=1.2",
-    "mkdocs-literate-nav>=0.6",
-    "mkdocs-material>=9.4",
-    "mkdocs-minify-plugin>=0.7",
-    "mkdocstrings[python]>=0.23",
-    "tomli>=2.0; python_version < '3.11'",
+[tool.pdm.build.wheel-data]
+# Manual pages can be included in the wheel.
+# Depending on the installation tool, they will be accessible to users.
+# pipx supports it, uv does not yet, see https://github.com/astral-sh/uv/issues/4731.
+data = [
+    {path = "share/**/*", relative-to = "."},
 ]
+
+[dependency-groups]
 maintain = [
-    "black>=23.9",
-    "blacken-docs>=1.16",
-    "git-changelog>=2.3",
+    "git-changelog>=2.5",
+    "twine>=5.1",
+    "yore>=0.3.3",
 ]
-quality = [
-    "ruff>=0.0",
-]
-tests = [
-    "pytest>=7.4",
-    "pytest-cov>=4.1",
+ci = [
+    "duty>=1.6",
+    "griffe>=2.0",
+    "pytest>=8.2",
+    "pytest-cov>=5.0",
     "pytest-randomly>=3.15",
-    "pytest-xdist>=3.3",
-]
-typing = [
-    "mypy>=1.5",
-    "types-markdown>=3.5",
+    "pytest-xdist>=3.6",
+    "ruff>=0.4",
+    "ty>=0.0.14",
+    "types-markdown>=3.6",
     "types-pyyaml>=6.0",
+    "zizmor>=1.0",
 ]
-security = [
-    "safety>=2.3",
+ docs = [
+    "ghp-import>=2.1",
+    "markdown-callouts>=0.4",
+    "markdown-exec>=1.8",
+    "mkdocstrings[python]>=0.29",
+    # YORE: EOL 3.10: Remove line.
+    "tomli>=2.0; python_version < '3.11'",
+    "zensical>=0.0.21",
 ]
+
+[tool.uv]
+default-groups = ["maintain", "ci", "docs"]
