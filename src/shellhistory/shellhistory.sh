@@ -357,22 +357,30 @@ _shellhistory_get_debug_trap() {
 }
 
 _shellhistory_enable() {
+  # Re-sourcing .zshrc / .bashrc, or `exec zsh`, must not stack duplicate hooks.
+  [ "${_SHELLHISTORY_ENABLED}" -eq 1 ] && return 0
+
   _SHELLHISTORY_BEFORE_DONE=2
   _SHELLHISTORY_AFTER_DONE=1
   _SHELLHISTORY_PRIVATE=0
   if [ -n "${ZSH_VERSION}" ]; then
-    preexec_functions+=(_shellhistory_before)
-    precmd_functions=(_shellhistory_after "${precmd_functions[@]}")
+    # shellcheck disable=SC2206
+    preexec_functions=(${preexec_functions:#_shellhistory_before} _shellhistory_before)
+    # shellcheck disable=SC2206
+    precmd_functions=(_shellhistory_after ${precmd_functions:#_shellhistory_after})
   elif [ -n "${BASH_VERSION}" ]; then
     PROMPT_COMMAND="_shellhistory_after;${PROMPT_COMMAND}"
     # shellcheck disable=SC2064
     trap "$(_shellhistory_get_debug_trap)_shellhistory_before;" DEBUG
   fi
+  _SHELLHISTORY_ENABLED=1
 }
 
 _shellhistory_disable() {
   local trap
   local new_prompt
+  [ "${_SHELLHISTORY_ENABLED}" -eq 0 ] && return 0
+
   _SHELLHISTORY_AFTER_DONE=1
   if [ -n "${ZSH_VERSION}" ]; then
     # shellcheck disable=SC2206
@@ -385,6 +393,7 @@ _shellhistory_disable() {
     new_prompt="${PROMPT_COMMAND//_shellhistory_after;}"
     PROMPT_COMMAND="trap '${trap:--}' DEBUG; PROMPT_COMMAND='${new_prompt}'"
   fi
+  _SHELLHISTORY_ENABLED=0
 }
 
 _shellhistory_usage() {
@@ -419,6 +428,7 @@ _SHELLHISTORY_UUID="${_SHELLHISTORY_UUID:-$(uuidgen)}"
 
 _SHELLHISTORY_AFTER_DONE=0
 _SHELLHISTORY_BEFORE_DONE=0
+_SHELLHISTORY_ENABLED=0
 _SHELLHISTORY_PRIVATE=0
 _SHELLHISTORY_PREVCMD_NUM=
 
