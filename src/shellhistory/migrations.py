@@ -134,10 +134,6 @@ def import_history():
     return import_file(db.HISTFILE_PATH)
 
 
-def update():
-    return import_history()
-
-
 # Schema migration ------------------------------------------------------------
 NEW_SCHEMA = """
 CREATE TABLE sessions (

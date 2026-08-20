@@ -1,15 +1,16 @@
 $(document).ready(function () {
-  $('#sync-close').click(function (e) {
+  $('#import-close').click(function (e) {
     $(this).parent().fadeOut(500);
   });
-  $("#sync-button").click(function () {
-    $.getJSON('/update', function (data) {
-      $('#sync-message').text(data.message);
-      $('#sync-alert')
+  // The shell writes straight to the database now, so this is only for loading
+  // an archived history file in the old colon-delimited text format.
+  $("#import-button").click(function () {
+    $.getJSON('/import_legacy', function (data) {
+      $('#import-message').text(data.message);
+      $('#import-alert')
         .removeClass()
         .addClass(data.class)
         .show();
     });
   });
 });
-

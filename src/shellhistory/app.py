@@ -80,6 +80,10 @@ def since_epoch(date):
     return time.mktime(date.timetuple())
 
 
+def plural(count, noun):
+    return "%s %s%s" % (count, noun, "" if count == 1 else "s")
+
+
 def fractional_year(start, end):
     this_year = end.year
     this_year_start = datetime(year=this_year, month=1, day=1)
@@ -95,31 +99,38 @@ def home_view():
     return render_template("home.html")
 
 
-@app.route("/update")
-def update_call():
+@app.route("/import_legacy")
+def import_legacy_call():
+    """Load the legacy text history file.
+
+    Commands reach the database directly now, so this is not how history gets
+    in: it is here to pick up an archived file written by an older version, or
+    the tail of one left behind by a shell that has not been re-sourced yet.
+    """
     data = {"message": None, "class": None}
     try:
-        report = migrations.update()
+        report = migrations.import_history()
     except Exception as e:
         data["class"] = "danger"
         data["message"] = "%s\n%s: %s" % (
-            "Failed to import current history. The following exception occurred:",
+            "Failed to import %s. The following exception occurred:" % db.HISTFILE_PATH,
             type(e),
             e,
         )
     else:
         if report.inserted:
             data["class"] = "success"
-            data["message"] = (
-                "Database successfully updated (%s new items), refresh the page to see the change." % report.inserted
+            data["message"] = "Imported %s from %s, refresh the page to see the change." % (
+                plural(report.inserted, "new record"),
+                db.HISTFILE_PATH,
             )
             if report.duplicates:
                 data["class"] = "info"
-                data["message"] += "\n%s duplicates were not imported." % report.duplicates
+                data["message"] += "\n%s already in the database." % plural(report.duplicates, "record")
 
         else:
             data["class"] = "default"
-            data["message"] = "Database already synchronized, nothing changed."
+            data["message"] = "Nothing new in %s." % db.HISTFILE_PATH
 
     return jsonify(data)
 
