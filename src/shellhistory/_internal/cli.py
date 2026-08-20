@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
 from typing import Any
 
 from shellhistory._internal import debug
@@ -54,6 +55,29 @@ def get_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="shellhistory")
     parser.add_argument("-V", "--version", action="version", version=f"%(prog)s {debug._get_version()}")
     parser.add_argument("--debug-info", action=_DebugInfo, help="Print debug information.")
+
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
+        "--location",
+        dest="location",
+        action="store_true",
+        help="Print the path of the shell script to source.",
+    )
+    group.add_argument("--web", dest="web", action="store_true", help="Run the web application.")
+    group.add_argument(
+        "--import",
+        dest="import_file",
+        action="store_true",
+        help="Import a legacy text history file into the database.",
+    )
+    group.add_argument(
+        "--migrate",
+        dest="migrate",
+        action="store_true",
+        help="Convert a legacy single-table database to the current schema.",
+    )
+    parser.add_argument("file", nargs="?", help="History file to import (defaults to $SHELLHISTORY_FILE).")
+
     return parser
 
 
@@ -70,5 +94,73 @@ def main(args: list[str] | None = None) -> int:
     """
     parser = get_parser()
     opts = parser.parse_args(args=args)
-    print(opts)
+
+    if opts.location:
+        return location()
+    if opts.web:
+        return web()
+    if opts.migrate:
+        return migrate()
+    if opts.import_file:
+        return import_legacy(opts.file)
+
+    parser.print_help()
+    return 0
+
+
+def location() -> int:
+    """Print the path of the shell script to source.
+
+    Returns:
+        An exit code.
+    """
+    print(Path(__file__).parent.parent / "shellhistory.sh")
+    return 0
+
+
+def web() -> int:
+    """Run the web application.
+
+    Returns:
+        An exit code.
+    """
+    # Imported here, not at module level: `shellhistory-location` runs from every
+    # shell's startup file, and it must not pay for importing Flask.
+    from shellhistory.app import app  # noqa: PLC0415
+
+    app.run()
+    return 0
+
+
+def migrate() -> int:
+    """Convert a legacy single-table database to the sessions + history split.
+
+    Returns:
+        An exit code.
+    """
+    from shellhistory import db, migrations  # noqa: PLC0415
+
+    if not db.is_legacy_schema():
+        print(f"{db.DB_PATH} is already on the current schema, nothing to do.")
+        return 0
+    result = migrations.migrate_schema()
+    print(
+        f"migrated {result['rows']} records into {result['sessions']} sessions\noriginal kept at {result['backup']}",
+    )
+    return 0
+
+
+def import_legacy(path: str | None = None) -> int:
+    """Import a legacy text history file into the database.
+
+    Parameters:
+        path: The file to import. Defaults to `$SHELLHISTORY_FILE`.
+
+    Returns:
+        An exit code.
+    """
+    from shellhistory import migrations  # noqa: PLC0415
+
+    report = migrations.import_file(path) if path else migrations.import_history()
+    print(f"imported {report.inserted} records ({report.duplicates} already present)")
     return 0

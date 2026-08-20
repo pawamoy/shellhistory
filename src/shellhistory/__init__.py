@@ -23,6 +23,6 @@ Visualize your usage of Bash/Zsh through a web app thanks to Flask and Highchart
 
 from __future__ import annotations
 
-from shellhistory._internal.cli import get_parser, main
+from shellhistory._internal.cli import get_parser, import_legacy, location, main, migrate, web
 
-__all__: list[str] = ["get_parser", "main"]
+__all__: list[str] = ["get_parser", "import_legacy", "location", "main", "migrate", "web"]

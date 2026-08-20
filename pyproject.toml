@@ -10,7 +10,7 @@ license = "ISC"
 license-files = ["LICENSE"]
 readme = "README.md"
 requires-python = ">=3.10"
-keywords = []
+keywords = ["shell", "bash", "zsh", "history", "analysis", "visualization"]
 dynamic = ["version"]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -28,7 +28,14 @@ classifiers = [
     "Topic :: Utilities",
     "Typing :: Typed",
 ]
-dependencies = []
+dependencies = [
+    "flask>=1.0,<3",
+    # 2.0 removed the template_mode argument that app.py passes to Admin().
+    "flask-admin>=1.5,<2",
+    # 1.4 is the floor: declarative_base moved to sqlalchemy.orm there.
+    "sqlalchemy>=1.4,<2.1",
+    "tqdm>=4.28",
+]
 
 [project.urls]
 Homepage = "https://pawamoy.github.io/shellhistory"
@@ -42,6 +49,11 @@ Funding = "https://github.com/sponsors/pawamoy"
 
 [project.scripts]
 shellhistory = "shellhistory:main"
+shellhistory-cli = "shellhistory:main"
+# The setup snippet in the README sources the shell integration through this,
+# and `shellhistory disable` in a running shell depends on it staying put.
+shellhistory-location = "shellhistory:location"
+shellhistory-web = "shellhistory:web"
 
 [tool.pdm.version]
 source = "call"
@@ -89,11 +101,13 @@ ci = [
     "types-pyyaml>=6.0",
     "zizmor>=1.0",
 ]
- docs = [
+docs = [
     "ghp-import>=2.1",
     "markdown-callouts>=0.4",
     "markdown-exec>=1.8",
     "mkdocstrings[python]>=0.29",
+    # docs/reference/shellhistory.md documents the shell integration with `handler: shell`.
+    "mkdocstrings-shell>=1.0",
     # YORE: EOL 3.10: Remove line.
     "tomli>=2.0; python_version < '3.11'",
     "zensical>=0.0.21",
