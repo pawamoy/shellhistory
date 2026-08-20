@@ -57,7 +57,7 @@ def get_session():
 
 class History(Base):
     __tablename__ = "history"
-    __table_args__ = (UniqueConstraint("start", "uuid"), {"useexisting": True})
+    __table_args__ = (UniqueConstraint("start", "uuid"), {"extend_existing": True})
 
     Tuple = namedtuple("HT", "start stop uuid parents host user tty path shell level type code cmd")
 
