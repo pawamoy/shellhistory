@@ -16,10 +16,19 @@
 
 if [ -n "${ZSH_VERSION}" ]; then
 
+  # zsh passes the command line to preexec hooks as $1. Reading it from there,
+  # rather than from $history[$HISTCMD], is what keeps us correct under
+  # HIST_IGNORE_DUPS, HIST_IGNORE_ALL_DUPS, HIST_IGNORE_SPACE, HIST_NO_STORE and
+  # HISTORY_IGNORE: none of those advance $HISTCMD, so the old implementation
+  # both re-read stale entries and silently dropped commands.
   _shellhistory_set_command() {
-    # multi-line commands have prepended ';' (starting at line 2)
-    # shellcheck disable=SC2154
-    _SHELLHISTORY_COMMAND="$(echo "${history[$HISTCMD]}" | sed -e '2,$s/^/;/')"
+    if [ -n "$1" ]; then
+      _SHELLHISTORY_COMMAND="$1"
+    else
+      # Fallback for the (unexpected) case of an empty preexec argument.
+      # shellcheck disable=SC2154
+      _SHELLHISTORY_COMMAND="${history[$HISTCMD]}"
+    fi
   }
 
   _shellhistory_set_command_type() {
@@ -29,16 +38,19 @@ if [ -n "${ZSH_VERSION}" ]; then
     _SHELLHISTORY_TYPE="${type##*: }"
   }
 
-  _shellhistory_last_command_number() {
-    # shellcheck disable=SC2086
-    echo $HISTCMD
+  # In zsh, preexec fires exactly once per command line, so the
+  # _SHELLHISTORY_BEFORE_DONE flag alone guarantees one record per prompt cycle.
+  # The $HISTCMD comparison Bash needs is not just redundant here, it is harmful:
+  # HISTCMD does not advance for entries zsh declines to store.
+  _shellhistory_can_append() {
+    [ "${_SHELLHISTORY_BEFORE_DONE}" -ne 1 ] && return 1
+    return 0
   }
 
 elif [ -n "${BASH_VERSION}" ]; then
 
   _shellhistory_set_command() {
-    # multi-line commands have prepended ';' (starting at line 2)
-    _SHELLHISTORY_COMMAND="$(fc -lnr -0 | sed -e '1s/^\t //;2,$s/^/;/')"
+    _SHELLHISTORY_COMMAND="$(fc -lnr -0 | sed -e '1s/^\t //')"
   }
 
   _shellhistory_set_command_type() {
@@ -50,6 +62,19 @@ elif [ -n "${BASH_VERSION}" ]; then
 
   _shellhistory_last_command_number() {
     fc -lr -0 | head -n1 | cut -f1
+  }
+
+  # The DEBUG trap fires for every command of a pipeline or list, so Bash does
+  # need to compare history numbers to avoid recording the same line twice.
+  _shellhistory_can_append() {
+    local last_number
+    [ "${_SHELLHISTORY_BEFORE_DONE}" -ne 1 ] && return 1
+    last_number="$(_shellhistory_last_command_number)"
+    if [ -n "${_SHELLHISTORY_PREVCMD_NUM}" ]; then
+      [ "${last_number}" -eq "${_SHELLHISTORY_PREVCMD_NUM}" ] && return 1
+    fi
+    _SHELLHISTORY_PREVCMD_NUM="${last_number}"
+    return 0
   }
 
 fi
@@ -106,17 +131,6 @@ _shellhistory_set_pwd() {
   _SHELLHISTORY_PWD_B64="$(printf '%s' "${PWD}" | base64 -w0)"
 }
 
-_shellhistory_can_append() {
-  local last_number
-  [ "${_SHELLHISTORY_BEFORE_DONE}" -ne 1 ] && return 1
-  last_number="$(_shellhistory_last_command_number)"
-  if [ -n "${_SHELLHISTORY_PREVCMD_NUM}" ]; then
-    [ "${last_number}" -eq "${_SHELLHISTORY_PREVCMD_NUM}" ] && return 1
-  fi
-  _SHELLHISTORY_PREVCMD_NUM="${last_number}"
-  return 0
-}
-
 _shellhistory_append() {
   if _shellhistory_can_append; then
     _shellhistory_append_to_file
@@ -124,6 +138,13 @@ _shellhistory_append() {
 }
 
 _shellhistory_append_to_file() {
+  local nl cmd
+  nl='
+'
+  # Continuation lines of a multi-line command are prefixed with ';' so the
+  # parser can tell them apart from the ':'-prefixed record header. Done here
+  # with a parameter expansion instead of piping through sed: no fork.
+  cmd="${_SHELLHISTORY_COMMAND//${nl}/${nl};}"
   printf ':%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s\n' \
     "${_SHELLHISTORY_START_TIME}" \
     "${_SHELLHISTORY_STOP_TIME}" \
@@ -137,13 +158,13 @@ _shellhistory_append_to_file() {
     "${SHLVL}" \
     "${_SHELLHISTORY_TYPE}" \
     "${_SHELLHISTORY_CODE}" \
-    "${_SHELLHISTORY_COMMAND}" >> "${SHELLHISTORY_FILE}"
+    "${cmd}" >> "${SHELLHISTORY_FILE}"
 }
 
 _shellhistory_before() {
   [ "${_SHELLHISTORY_BEFORE_DONE}" -gt 0 ] && return
 
-  _shellhistory_set_command
+  _shellhistory_set_command "$@"
   _shellhistory_set_command_type
   _shellhistory_set_pwd
   _shellhistory_start_timer
