@@ -35,7 +35,7 @@ thanks to [Flask](http://flask.pocoo.org/) and [Highcharts](https://www.highchar
 - [Usage](#usage)
 - [Some technical info](#some-technical-info)
   - [How it works](#how-it-works)
-  - [History file format](#history-file-format)
+  - [Storage](#storage)
   - [How we get the values](#how-we-get-the-values)
 - [License](#license)
 
@@ -128,45 +128,45 @@ and store the current working directory and the command itself.
 
 After the command has finished, we store the return code, and stop the timer.
 
-### History file format
+### Storage
 
-Fields saved along commands are start and stop timestamps, hostname, username,
-uuid (generated), tty, process' parents, shell, shell level, command type,
-return code, and working directory (path), in the following format:
-`:start:stop:uuid:parents:host:user:tty:path:shell:level:type:code:command`.
+Records go straight into a SQLite database (`~/.shellhistory/db.sqlite3` by
+default, `$SHELLHISTORY_DB` to override). At the end of each command the shell
+spawns a small detached writer, `record.py`, which uses nothing but the standard
+library and never makes the prompt wait on it.
 
-- multi-line commands are prepended with a semi-colon `;` instead of a colon `:`,
-  starting at second line
-- start and stop timestamps are in microseconds since epoch
-- process' parents and working directory are encoded in base64 to avoid
-  delimiter corruption.
+The schema has two tables. Everything that stays the same for the whole life of
+a shell -- host, user, tty, shell, level and the process ancestry -- is written
+once into `sessions`; `history` holds what changes per command (start, stop,
+type, return code, working directory, the command itself) and points at its
+session. The ancestry string alone is a few hundred bytes and there are only a
+couple of thousand distinct ones, so repeating it on every row used to account
+for half the database file.
 
-Example (multi-line command):
+Values are passed to the writer as separate arguments and bound as query
+parameters, so nothing in a command line can be mistaken for a field separator
+or for SQL. That is why no encoding is needed: newlines, colons and quotes are
+all stored verbatim.
+
+SQLite is configured for many small concurrent writers -- WAL journaling so
+writers do not block readers, and a busy timeout so a shell that loses the race
+waits its turn instead of dropping the record. If the database cannot be written
+at all, the record is appended to `~/.shellhistory/unrecorded.jsonl` rather than
+lost.
+
+#### Legacy text format
+
+Earlier versions appended to a colon-delimited text file, base64-encoding the
+paths and ancestry to protect the delimiter, with `;` prefixing continuation
+lines of a multi-line command:
 
 ```
-:1510588139930150:1510588139936608:40701d9b-1807-4a3e-994b-dde68692aa14:L2Jpbi9iYXNoCi91c3IvYmluL3B5dGhvbiAvdXNyL2Jpbi94LXRlcm1pbmFsLWVtdWxhdG9yCi91c3IvYmluL29wZW5ib3ggLS1zdGFydHVwIC91c3IvbGliL3g4Nl82NC1saW51eC1nbnUvb3BlbmJveC1hdXRvc3RhcnQgT1BFTkJPWApsaWdodGRtIC0tc2Vzc2lvbi1jaGlsZCAxMiAyMQovdXNyL3NiaW4vbGlnaHRkbQovc2Jpbi9pbml0Cg==:myhost:pawamoy:/dev/pts/1:L21lZGlhL3Bhd2Ftb3kvRGF0YS9naXQvc2hlbGxoaXN0Cg==:/bin/bash:1:builtin:0:echo "a
-;b
-;c" | wc -c
+:start:stop:uuid:parents:host:user:tty:path:shell:level:type:code:command
 ```
 
-**Note:** later we could use CSV formatting, quoting
-strings and doubling double-quotes in those if any.
-It would make the file more readable for humans,
-and easily importable in other programs.
-See [issue 26](https://github.com/pawamoy/shell-history/issues/26).
-
-The previous example would look like this:
-```
-1510588139930150,1510588139936608,40701d9b-1807-4a3e-994b-dde68692aa14,"/bin/bash
-/usr/bin/python /usr/bin/x-terminal-emulator
-/usr/bin/openbox --startup /usr/lib/x86_64-linux-gnu/openbox-autostart OPENBOX
-lightdm --session-child 12 21
-/usr/sbin/lightdm
-/sbin/init",myhost,pawamoy,/dev/pts/1,"/media/pawamoy/Data/git/shellhist",/bin/bash,1,builtin,0,"echo ""a
-b
-c"" | wc -c"
-```
-
+`shellhistory-cli --import [FILE]` still reads that format, so archived history
+files can be loaded. A database created by an older version is converted with
+`shellhistory-cli --migrate`, which keeps the original alongside as a backup.
 ### How we get the values
 
 Start and stop time are obtained with `date '+%s%N'`, return code is passed
