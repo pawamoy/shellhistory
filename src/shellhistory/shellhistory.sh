@@ -16,6 +16,12 @@
 
 if [ -n "${ZSH_VERSION}" ]; then
 
+  # zsh/datetime provides $epochtime, zsh/parameter provides $commands,
+  # $builtins, $functions, $aliases and $reswords. With both loaded we can
+  # collect everything below without forking a single process per command.
+  zmodload zsh/datetime 2>/dev/null
+  zmodload zsh/parameter 2>/dev/null
+
   # zsh passes the command line to preexec hooks as $1. Reading it from there,
   # rather than from $history[$HISTCMD], is what keeps us correct under
   # HIST_IGNORE_DUPS, HIST_IGNORE_ALL_DUPS, HIST_IGNORE_SPACE, HIST_NO_STORE and
@@ -44,12 +50,43 @@ if [ -n "${ZSH_VERSION}" ]; then
     return 1
   }
 
-  _shellhistory_set_command_type() {
-    local type
-    _shellhistory_first_word
-    type="$(whence -w -- "${_SHELLHISTORY_WORD}" 2>/dev/null)"
-    _SHELLHISTORY_TYPE="${type##*: }"
-  }
+  if [ -n "${epochtime+x}" ]; then
+    _shellhistory_time_now() {
+      # shellcheck disable=SC2154
+      _SHELLHISTORY_NOW=$(( epochtime[1] * 1000000 + epochtime[2] / 1000 ))
+    }
+  fi
+
+  if [ -n "${builtins+x}" ]; then
+    # Mirrors `whence -w`, zsh's own vocabulary, so the fast path and the
+    # fallback below cannot disagree about what a command is.
+    _shellhistory_set_command_type() {
+      local word
+      _shellhistory_first_word
+      word="${_SHELLHISTORY_WORD}"
+      # shellcheck disable=SC2154
+      if [ -n "${aliases[$word]}" ]; then
+        _SHELLHISTORY_TYPE=alias
+      elif [ -n "${reswords[(r)$word]}" ]; then
+        _SHELLHISTORY_TYPE=reserved
+      elif [ -n "${functions[$word]}" ]; then
+        _SHELLHISTORY_TYPE=function
+      elif [ -n "${builtins[$word]}" ]; then
+        _SHELLHISTORY_TYPE=builtin
+      elif [ -n "${commands[$word]}" ]; then
+        _SHELLHISTORY_TYPE=command
+      else
+        _SHELLHISTORY_TYPE=none
+      fi
+    }
+  else
+    _shellhistory_set_command_type() {
+      local type
+      _shellhistory_first_word
+      type="$(whence -w -- "${_SHELLHISTORY_WORD}" 2>/dev/null)"
+      _SHELLHISTORY_TYPE="${type##*: }"
+    }
+  fi
 
   # In zsh, preexec fires exactly once per command line, so the
   # _SHELLHISTORY_BEFORE_DONE flag alone guarantees one record per prompt cycle.
@@ -77,6 +114,14 @@ elif [ -n "${BASH_VERSION}" ]; then
     esac
     return 1
   }
+
+  if [ -n "${EPOCHREALTIME}" ]; then
+    # Bash >= 5.0. The separator is locale-dependent, hence the [.,] pattern.
+    _shellhistory_time_now() {
+      local now="${EPOCHREALTIME}"
+      _SHELLHISTORY_NOW="${now/[.,]/}"
+    }
+  fi
 
   _shellhistory_set_command_type() {
     local type
@@ -133,17 +178,40 @@ _shellhistory_first_word() {
   _SHELLHISTORY_WORD="${word%%[[:space:]]*}"
 }
 
-# shellcheck disable=SC2120
-_shellhistory_parents() {
-  local list pid line
-  list="$(ps -eo pid,ppid,command | tr -s ' ' | sed 's/^ //g')"
-  pid=$$
-  while [ "${pid}" -ne 0 ]; do
-    line="$(echo "${list}" | grep --text "^${pid} ")"
-    echo "${line}" | cut -d' ' -f3-
-    pid=$(echo "${line}" | cut -d' ' -f2)
-  done
-}
+# Walk the process ancestry. The /proc fast path avoids scanning the whole
+# process table (and forking grep + cut twice per level), which took over 100ms
+# of every shell startup.
+if [ -r "/proc/$$/status" ]; then
+  _shellhistory_parents() {
+    local pid ppid key value
+    pid=$$
+    while [ -n "${pid}" ] && [ "${pid}" != "0" ]; do
+      [ -r "/proc/${pid}/cmdline" ] || break
+      tr '\0' ' ' < "/proc/${pid}/cmdline"
+      echo
+      ppid=
+      while read -r key value; do
+        if [ "${key}" = "PPid:" ]; then
+          ppid="${value}"
+          break
+        fi
+      done < "/proc/${pid}/status"
+      pid="${ppid}"
+    done
+  }
+else
+  # shellcheck disable=SC2120
+  _shellhistory_parents() {
+    local list pid line
+    list="$(ps -eo pid,ppid,command | tr -s ' ' | sed 's/^ //g')"
+    pid=$$
+    while [ "${pid}" -ne 0 ]; do
+      line="$(echo "${list}" | grep --text "^${pid} ")"
+      echo "${line}" | cut -d' ' -f3-
+      pid=$(echo "${line}" | cut -d' ' -f2)
+    done
+  }
+fi
 
 # The absolute path of the *running* shell. $SHELL is the user's login shell
 # preference, so it reports "/bin/bash" for every command typed into a zsh
@@ -164,25 +232,29 @@ _shellhistory_detect_shell() {
   printf '%s' "${exe}"
 }
 
-_shellhistory_nanos="$(date '+%N' 2>/dev/null)"
-case "${_shellhistory_nanos}" in
-  '' | *[!0-9]*)
-    # BSD/macOS date has no %N and prints a literal "N": fall back to
-    # whole-second resolution rather than emitting "1786961197N" and landing
-    # every timestamp somewhere in 1970.
-    _shellhistory_time_now() {
-      _SHELLHISTORY_NOW="$(date '+%s')000000"
-    }
-    ;;
-  *)
-    _shellhistory_time_now() {
-      local now
-      now="$(date '+%s%N')"
-      _SHELLHISTORY_NOW="${now%???}"
-    }
-    ;;
-esac
-unset _shellhistory_nanos
+# Used when neither zsh/datetime nor Bash 5's $EPOCHREALTIME is available
+# (notably Bash 3.2, which is what macOS ships).
+if ! command -v _shellhistory_time_now >/dev/null 2>&1; then
+  _shellhistory_nanos="$(date '+%N' 2>/dev/null)"
+  case "${_shellhistory_nanos}" in
+    '' | *[!0-9]*)
+      # BSD/macOS date has no %N and prints a literal "N": fall back to
+      # whole-second resolution rather than emitting "1786961197N" and landing
+      # every timestamp somewhere in 1970.
+      _shellhistory_time_now() {
+        _SHELLHISTORY_NOW="$(date '+%s')000000"
+      }
+      ;;
+    *)
+      _shellhistory_time_now() {
+        local now
+        now="$(date '+%s%N')"
+        _SHELLHISTORY_NOW="${now%???}"
+      }
+      ;;
+  esac
+  unset _shellhistory_nanos
+fi
 
 _shellhistory_start_timer() {
   if [ -z "${_SHELLHISTORY_START_TIME}" ]; then
@@ -200,7 +272,10 @@ _shellhistory_set_code() {
   _SHELLHISTORY_CODE=$?
 }
 
+# The working directory rarely changes between two commands, so cache the
+# encoding and skip the base64 fork on the vast majority of prompts.
 _shellhistory_set_pwd() {
+  [ "${_SHELLHISTORY_PWD}" = "${PWD}" ] && return 0
   _SHELLHISTORY_PWD="${PWD}"
   _SHELLHISTORY_PWD_B64="$(printf '%s' "${PWD}" | _shellhistory_b64)"
 }
