@@ -31,6 +31,19 @@ if [ -n "${ZSH_VERSION}" ]; then
     fi
   }
 
+  # Honour the user's history-privacy settings. A leading space under
+  # HIST_IGNORE_SPACE is the idiomatic way to keep a secret out of the history,
+  # so we must not record it either.
+  _shellhistory_is_private() {
+    if [[ -o hist_ignore_space ]] && [[ "$1" == ' '* || "$1" == $'\t'* ]]; then
+      return 0
+    fi
+    if [[ -n "${HISTORY_IGNORE}" && "$1" == ${~HISTORY_IGNORE} ]]; then
+      return 0
+    fi
+    return 1
+  }
+
   _shellhistory_set_command_type() {
     local type
     _shellhistory_first_word
@@ -44,6 +57,7 @@ if [ -n "${ZSH_VERSION}" ]; then
   # HISTCMD does not advance for entries zsh declines to store.
   _shellhistory_can_append() {
     [ "${_SHELLHISTORY_BEFORE_DONE}" -ne 1 ] && return 1
+    [ "${_SHELLHISTORY_PRIVATE}" -eq 1 ] && return 1
     return 0
   }
 
@@ -51,6 +65,17 @@ elif [ -n "${BASH_VERSION}" ]; then
 
   _shellhistory_set_command() {
     _SHELLHISTORY_COMMAND="$(fc -lnr -0 | sed -e '1s/^\t //')"
+  }
+
+  _shellhistory_is_private() {
+    case "${HISTCONTROL}" in
+      *ignorespace* | *ignoreboth*)
+        case "$1" in
+          ' '*) return 0 ;;
+        esac
+        ;;
+    esac
+    return 1
   }
 
   _shellhistory_set_command_type() {
@@ -69,6 +94,7 @@ elif [ -n "${BASH_VERSION}" ]; then
   _shellhistory_can_append() {
     local last_number
     [ "${_SHELLHISTORY_BEFORE_DONE}" -ne 1 ] && return 1
+    [ "${_SHELLHISTORY_PRIVATE}" -eq 1 ] && return 1
     last_number="$(_shellhistory_last_command_number)"
     if [ -n "${_SHELLHISTORY_PREVCMD_NUM}" ]; then
       [ "${last_number}" -eq "${_SHELLHISTORY_PREVCMD_NUM}" ] && return 1
@@ -77,6 +103,13 @@ elif [ -n "${BASH_VERSION}" ]; then
     return 0
   }
 
+fi
+
+# PORTABLE FALLBACKS -----------------------------------------------------------
+
+# Fallback for shells that are neither Bash nor Zsh.
+if ! command -v _shellhistory_is_private >/dev/null 2>&1; then
+  _shellhistory_is_private() { return 1; }
 fi
 
 # HELPERS ----------------------------------------------------------------------
@@ -165,8 +198,14 @@ _shellhistory_before() {
   [ "${_SHELLHISTORY_BEFORE_DONE}" -gt 0 ] && return
 
   _shellhistory_set_command "$@"
-  _shellhistory_set_command_type
-  _shellhistory_set_pwd
+  if _shellhistory_is_private "${_SHELLHISTORY_COMMAND}"; then
+    _SHELLHISTORY_PRIVATE=1
+    _SHELLHISTORY_COMMAND=
+  else
+    _SHELLHISTORY_PRIVATE=0
+    _shellhistory_set_command_type
+    _shellhistory_set_pwd
+  fi
   _shellhistory_start_timer
 
   _SHELLHISTORY_AFTER_DONE=0
@@ -204,6 +243,7 @@ _shellhistory_get_debug_trap() {
 _shellhistory_enable() {
   _SHELLHISTORY_BEFORE_DONE=2
   _SHELLHISTORY_AFTER_DONE=1
+  _SHELLHISTORY_PRIVATE=0
   if [ -n "${ZSH_VERSION}" ]; then
     preexec_functions+=(_shellhistory_before)
     precmd_functions=(_shellhistory_after "${precmd_functions[@]}")
@@ -262,6 +302,7 @@ _SHELLHISTORY_UUID="${_SHELLHISTORY_UUID:-$(uuidgen)}"
 
 _SHELLHISTORY_AFTER_DONE=0
 _SHELLHISTORY_BEFORE_DONE=0
+_SHELLHISTORY_PRIVATE=0
 _SHELLHISTORY_PREVCMD_NUM=
 
 SHELLHISTORY_FILE="${SHELLHISTORY_FILE:-$HOME/.shellhistory/history}"
