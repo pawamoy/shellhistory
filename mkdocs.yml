@@ -2,7 +2,7 @@ site_name: "Shell History"
 site_description: "Visualize your usage of Bash/Zsh through a web app thanks to Flask and Highcharts!"
 site_url: "https://pawamoy.github.io/shellhistory"
 repo_url: "https://github.com/pawamoy/shellhistory"
-repo_name: "pawamoy/shell-history"
+repo_name: "pawamoy/shellhistory"
 
 nav:
 - Home:

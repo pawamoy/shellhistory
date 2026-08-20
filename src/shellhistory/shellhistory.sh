@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 #
-# shell-history: record rich shell history for Bash and Zsh.
+# shellhistory: record rich shell history for Bash and Zsh.
 #
 # Each shell provides its own implementation of a small set of primitives:
 #
@@ -226,7 +226,7 @@ fi
 # Sets _SHELLHISTORY_WORD to the first word of the command, ignoring leading
 # whitespace. Assigns rather than echoes so callers do not need a $(...) fork.
 # FIXME: what about "VAR=value command do something"?
-# See https://github.com/Pawamoy/shell-history/issues/13
+# See https://github.com/Pawamoy/shellhistory/issues/13
 _shellhistory_first_word() {
   local cmd word
   cmd="${_SHELLHISTORY_COMMAND}"

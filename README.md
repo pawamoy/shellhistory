@@ -34,7 +34,7 @@ thanks to [Flask](http://flask.pocoo.org/) and [Highcharts](https://www.highchar
   </tr>
 </table>
 
-<p align="center"><i>Post your charts ideas in <a href="https://github.com/pawamoy/shell-history/issues/9">this issue</a>!</i></p>
+<p align="center"><i>Post your charts ideas in <a href="https://github.com/pawamoy/shellhistory/issues/9">this issue</a>!</i></p>
 
 - [Requirements](#requirements)
 - [Installation](#installation)
@@ -191,8 +191,8 @@ function that iteratively greps `ps` result with PIDs (see `shellhistory.sh`).
 
 Values for user, shell, and level are simply obtained through environment
 variables: `$USER`, `$SHELL` (though its use here is incorrect:
-see [issue 24](https://github.com/pawamoy/shell-history/issues/24)),
-and `$SHLVL` (also see [issue 25](https://github.com/pawamoy/shell-history/issues/25)).
+see [issue 24](https://github.com/pawamoy/shellhistory/issues/24)),
+and `$SHLVL` (also see [issue 25](https://github.com/pawamoy/shellhistory/issues/25)).
 
 The last command is obtained with the command `fc`.
 Using `fc` allows `shellhistory` to have the same behavior as your history:

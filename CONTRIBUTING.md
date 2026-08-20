@@ -10,7 +10,7 @@ Nothing easier!
 Fork and clone the repository, then:
 
 ```bash
-cd shell-history
+cd shellhistory
 make setup
 ```
 
