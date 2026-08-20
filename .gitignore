@@ -12,3 +12,4 @@ site/
 poetry.lock
 .venv/
 shellhistory.db
+db.sqlite3

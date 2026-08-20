@@ -10,7 +10,7 @@ from flask_admin import Admin
 from flask_admin.contrib.sqla import ModelView
 from sqlalchemy import desc, extract, func
 
-from . import db
+from . import db, migrations
 
 # Initialization and constants ------------------------------------------------
 app = Flask(__name__)
@@ -30,27 +30,35 @@ class HistoryModelView(ModelView):
 
     list_template = "admin/history_list.html"
 
-    column_exclude_list = ["parents"]
+    # host, user, uuid, tty, shell, level and parents belong to the session the
+    # command ran in, so they are reached through the relationship rather than
+    # repeated on every row.
+    column_list = [
+        "id", "start", "stop", "type", "code", "path", "cmd",
+        "session.host", "session.user", "session.uuid", "session.tty",
+        "session.shell", "session.level",
+    ]
     column_searchable_list = [
-        "id",
-        "start",
-        "stop",
-        "duration",
-        "host",
-        "user",
-        "uuid",
-        "tty",
-        "parents",
-        "shell",
-        "level",
         "type",
         "code",
         "path",
         "cmd",
+        "session.host",
+        "session.user",
+        "session.uuid",
+        "session.tty",
+        "session.shell",
     ]
-    column_filters = ["host", "user", "uuid", "tty", "parents", "shell", "level", "type", "code", "path", "cmd"]
-    column_editable_list = ["host", "user", "uuid", "tty", "shell", "level", "type", "code", "path", "cmd"]
-    form_excluded_columns = ["start", "stop", "duration"]
+    column_filters = [
+        "start", "type", "code", "path", "cmd",
+        "session.host", "session.user", "session.uuid", "session.tty",
+        "session.shell", "session.level", "session.parents",
+    ]
+    # Only the command's own columns are editable in place: a session row is
+    # shared by every command that ran in that shell, so editing it here would
+    # silently rewrite unrelated history.
+    column_editable_list = ["type", "code", "path", "cmd"]
+    form_excluded_columns = ["start", "stop"]
     # form_widget_args = {
     #     'start': {'format': '%Y-%m-%d %H:%M:%S.%f'},
     #     'stop': {'format': '%Y-%m-%d %H:%M:%S.%f'},
@@ -91,7 +99,7 @@ def home_view():
 def update_call():
     data = {"message": None, "class": None}
     try:
-        report = db.update()
+        report = migrations.update()
     except Exception as e:
         data["class"] = "danger"
         data["message"] = "%s\n%s: %s" % (
@@ -244,9 +252,14 @@ def daily_average_json():
 @app.route("/duration_json")
 def duration_json():
     session = db.Session()
-    results = session.query(db.History.duration).all()
+    results = session.query(db.History.start, db.History.stop).all()
 
-    flat_values = [r[0].seconds + round(r[0].microseconds / 1000) for r in results]
+    flat_values = []
+    for start, stop in results:
+        if start is None or stop is None:
+            continue
+        delta = stop - start
+        flat_values.append(delta.seconds + round(delta.microseconds / 1000))
     counter = Counter(flat_values)
 
     data = {

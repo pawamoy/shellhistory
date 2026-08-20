@@ -1,26 +1,34 @@
-import codecs
+"""Database engine and models.
+
+The schema is split in two tables. Everything that stays constant for the whole
+life of a shell -- who and where it is, its tty, its process ancestry -- lives
+once in `sessions`; `history` holds only what changes from one command to the
+next and points at its session.
+
+That split is not cosmetic. The ancestry string is ~300 bytes and there are only
+a couple of thousand distinct ones, so repeating it on every row made it half of
+the database file on its own.
+"""
+
 import os
-import sys
-from base64 import b64decode
-from collections import namedtuple
 from datetime import datetime
 from pathlib import Path
 
 from sqlalchemy import (
     Column,
     DateTime,
+    ForeignKey,
     Integer,
-    Interval,
     String,
     Text,
     UnicodeText,
     UniqueConstraint,
     create_engine,
-    exc,
+    event,
+    inspect,
 )
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import scoped_session, sessionmaker
-from tqdm import tqdm
+from sqlalchemy.orm import relationship, scoped_session, sessionmaker
 
 DEFAULT_DIR = Path.home() / ".shellhistory"
 
@@ -44,8 +52,21 @@ Base = declarative_base()
 engine = create_engine("sqlite:///%s" % DB_PATH, connect_args={"check_same_thread": False})
 
 
-def create_tables():
-    Base.metadata.create_all(engine)
+@event.listens_for(engine, "connect")
+def _apply_pragmas(dbapi_connection, connection_record):
+    """Configure SQLite for many small concurrent writers.
+
+    Every recorded command is written by its own short-lived process, and any
+    number of shells may be running at once. WAL keeps those writers from
+    blocking readers, and `busy_timeout` makes a writer that loses the race wait
+    its turn rather than raising SQLITE_BUSY -- which, unhandled, would silently
+    drop the command.
+    """
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.execute("PRAGMA busy_timeout=5000")
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
 
 
 Session = scoped_session(sessionmaker(bind=engine))
@@ -55,169 +76,104 @@ def get_session():
     return Session
 
 
-class History(Base):
-    __tablename__ = "history"
-    __table_args__ = (UniqueConstraint("start", "uuid"), {"extend_existing": True})
+class ShellSession(Base):
+    """One shell process, identified by everything that cannot change while it runs.
 
-    Tuple = namedtuple("HT", "start stop uuid parents host user tty path shell level type code cmd")
+    The uuid alone is not enough: it is exported, so a subshell inherits it from
+    its parent while having its own level and its own ancestry.
+    """
+
+    __tablename__ = "sessions"
+    __table_args__ = (UniqueConstraint("uuid", "host", "user", "tty", "shell", "level", "parents"),)
 
     id = Column(Integer, primary_key=True)
-    start = Column(DateTime)
-    stop = Column(DateTime)
-    duration = Column(Interval)
+    uuid = Column(String, index=True)
     host = Column(String)
     user = Column(String)
-    uuid = Column(String)
     tty = Column(String)
-    parents = Column(Text)
     shell = Column(String)
     level = Column(Integer)
+    parents = Column(Text)
+
+    def __repr__(self):
+        return "<ShellSession(uuid='%s', tty='%s', level=%s)>" % (self.uuid, self.tty, self.level)
+
+
+class History(Base):
+    __tablename__ = "history"
+    __table_args__ = (UniqueConstraint("start", "session_id"),)
+
+    id = Column(Integer, primary_key=True)
+    session_id = Column(Integer, ForeignKey("sessions.id"), nullable=False, index=True)
+    start = Column(DateTime, index=True)
+    stop = Column(DateTime)
     type = Column(String)
     code = Column(Integer)
     path = Column(String)
     cmd = Column(UnicodeText)
 
+    session = relationship("ShellSession", backref="commands", lazy="joined")
+
+    @property
+    def duration(self):
+        """Kept as a derived value: it is exactly stop - start, so storing it wasted a column."""
+        if self.start is None or self.stop is None:
+            return None
+        return self.stop - self.start
+
     def __repr__(self):
         return "<History(path='%s', cmd='%s')>" % (self.path, self.cmd)
 
-    @staticmethod
-    def line_to_tuple(line):
-        return History.Tuple(*line.split(":", 12))
 
-    @staticmethod
-    def tuple_to_db_object(nt):
-        start = datetime.fromtimestamp(float(nt.start) / 1000000.0)
-        stop = datetime.fromtimestamp(float(nt.stop) / 1000000.0)
-        duration = stop - start
-        return History(
-            start=start,
-            stop=stop,
-            duration=duration,
-            host=nt.host,
-            user=nt.user,
-            path=b64decode(nt.path).decode().rstrip("\n"),
-            uuid=nt.uuid,
-            tty=nt.tty,
-            parents=b64decode(nt.parents).decode().rstrip("\n"),
-            shell=nt.shell,
-            level=nt.level,
-            type=nt.type,
-            code=nt.code,
-            cmd=nt.cmd,
+def is_legacy_schema():
+    """True if the database still has the old single-table layout."""
+    if not Path(DB_PATH).exists():
+        return False
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+    if "history" not in tables:
+        return False
+    columns = {c["name"] for c in inspector.get_columns("history")}
+    return "parents" in columns or "session_id" not in columns
+
+
+def create_tables():
+    """Create the tables if they are missing.
+
+    Refuses to touch a legacy database: `create_all` would see the old `history`
+    table, leave it exactly as it is, and the application would then fail against
+    a schema it cannot read. Better to say so.
+    """
+    if is_legacy_schema():
+        raise RuntimeError(
+            "%s uses the old single-table schema. "
+            "Run `shellhistory-cli --migrate` to convert it (the original is kept as a backup)." % DB_PATH,
         )
-
-    @staticmethod
-    def from_line(line):
-        return History.tuple_to_db_object(History.line_to_tuple(line))
+    Base.metadata.create_all(engine)
 
 
-# Must run *after* History is declared, otherwise Base.metadata is still empty
-# and create_all() silently creates a database without any table in it.
-# create_all() is idempotent (checkfirst=True), so it is safe on every import.
-create_tables()
+class SessionCache:
+    """Get-or-create for `sessions` rows, memoized for the life of the importer."""
 
+    def __init__(self, sqla_session):
+        self.sqla_session = sqla_session
+        self._ids = {}
 
-def flush():
-    session = Session()
-    session.query(History).delete()
-    session.commit()
+    def id_for(self, uuid, host, user, tty, shell, level, parents):
+        key = (uuid, host, user, tty, shell, level, parents)
+        if key in self._ids:
+            return self._ids[key]
+        row = (
+            self.sqla_session.query(ShellSession)
+            .filter_by(uuid=uuid, host=host, user=user, tty=tty, shell=shell, level=level, parents=parents)
+            .one_or_none()
+        )
+        if row is None:
+            row = ShellSession(
+                uuid=uuid, host=host, user=user, tty=tty, shell=shell, level=level, parents=parents,
+            )
+            self.sqla_session.add(row)
+            self.sqla_session.flush()
+        self._ids[key] = row.id
+        return row.id
 
-
-def delete_table(table=History):
-    table.__table__.drop(engine)
-
-
-def yield_db_object_blocks(path, size=512):
-    block = []
-
-    with codecs.open(path, encoding="utf-8", errors="ignore") as stream:
-        num_lines = sum(1 for _ in stream)
-
-    with codecs.open(path, encoding="utf-8", errors="ignore") as stream:
-        current_obj = None
-
-        for i, line in enumerate(tqdm(stream, total=num_lines, unit="lines"), 1):
-            first_char, line = line[0], line[1:].rstrip("\n")
-
-            if first_char == ":":
-                # new command
-                if current_obj is not None:
-                    block.append(current_obj)
-                try:
-                    current_obj = History.from_line(line)
-                except Exception as e:
-                    print(f"Line {i}: {e}\n{line}", file=sys.stderr)
-            elif first_char == ";":
-                # multi-line command
-                if current_obj is None:
-                    continue  # orphan line
-                current_obj.cmd += "\n" + line
-            else:
-                # would only happen if file is corrupted
-                print(f"Line {i}: invalid line starting with {first_char}\n{line}", file=sys.stderr)
-
-            if len(block) == size:
-                yield block
-                block = []
-
-        if current_obj is not None:
-            block.append(current_obj)
-
-    if block:
-        yield block
-
-
-InsertionReport = namedtuple("Report", "inserted duplicates")
-
-
-def insert(obj_list, session, one_by_one=False):
-    if obj_list:
-
-        if one_by_one:
-            duplicates, inserted = 0, 0
-
-            for obj in obj_list:
-
-                try:
-                    session.add(obj)
-                    session.commit()
-                    inserted += 1
-                except exc.IntegrityError:
-                    session.rollback()
-                    duplicates += 1
-
-            return InsertionReport(inserted, duplicates)
-
-        else:
-            session.add_all(obj_list)
-            session.commit()
-            return InsertionReport(len(obj_list), 0)
-
-    return InsertionReport(0, 0)
-
-
-def import_file(path):
-    session = Session()
-    reports = []
-
-    for obj_list in yield_db_object_blocks(path):
-
-        try:
-            reports.append(insert(obj_list, session))
-        except exc.IntegrityError:
-            session.rollback()
-            reports.append(insert(obj_list, session, one_by_one=True))
-
-    final_report = InsertionReport(sum([r.inserted for r in reports]), sum([r.duplicates for r in reports]))
-
-    return final_report
-
-
-def import_history():
-    if not HISTFILE_PATH.exists():
-        raise ValueError("%s: no such file" % HISTFILE_PATH)
-    return import_file(HISTFILE_PATH)
-
-
-def update():
-    return import_history()
