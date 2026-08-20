@@ -137,6 +137,25 @@ _shellhistory_parents() {
   done
 }
 
+# The absolute path of the *running* shell. $SHELL is the user's login shell
+# preference, so it reports "/bin/bash" for every command typed into a zsh
+# started from a bash terminal, from tmux, or from a container.
+_shellhistory_detect_shell() {
+  local exe=
+  exe="$(readlink "/proc/$$/exe" 2>/dev/null)"
+  if [ -z "${exe}" ]; then
+    if [ -n "${ZSH_VERSION}" ]; then
+      exe="$(command -v zsh 2>/dev/null)"
+      exe="${exe:-zsh}"
+    elif [ -n "${BASH_VERSION}" ]; then
+      exe="${BASH:-bash}"
+    else
+      exe="${SHELL}"
+    fi
+  fi
+  printf '%s' "${exe}"
+}
+
 _shellhistory_time_now() {
   local now
   now="$(date '+%s%N')"
@@ -187,7 +206,7 @@ _shellhistory_append_to_file() {
     "${USER}" \
     "${_SHELLHISTORY_TTY}" \
     "${_SHELLHISTORY_PWD_B64}" \
-    "${SHELL}" \
+    "${_SHELLHISTORY_SHELL}" \
     "${SHLVL}" \
     "${_SHELLHISTORY_TYPE}" \
     "${_SHELLHISTORY_CODE}" \
@@ -292,6 +311,7 @@ _SHELLHISTORY_PARENTS="$(_shellhistory_parents)"
 _SHELLHISTORY_PARENTS_B64="$(printf '%s' "${_SHELLHISTORY_PARENTS}" | base64 -w0)"
 _SHELLHISTORY_PWD=
 _SHELLHISTORY_PWD_B64=
+_SHELLHISTORY_SHELL="$(_shellhistory_detect_shell)"
 _SHELLHISTORY_START_TIME=
 _SHELLHISTORY_STOP_TIME=
 _SHELLHISTORY_TTY="$(tty)"
