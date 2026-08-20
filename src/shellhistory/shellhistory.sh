@@ -1,34 +1,71 @@
-# FUNCTIONS --------------------------------------------------------------------
+# shellcheck shell=bash
+#
+# shell-history: record rich shell history for Bash and Zsh.
+#
+# Each shell provides its own implementation of a small set of primitives:
+#
+#   _shellhistory_set_command       -> sets _SHELLHISTORY_COMMAND
+#   _shellhistory_set_command_type  -> sets _SHELLHISTORY_TYPE
+#   _shellhistory_time_now          -> sets _SHELLHISTORY_NOW (microseconds)
+#   _shellhistory_can_append        -> returns 0 if the record should be written
+#
+# They assign to variables rather than writing to stdout on purpose: capturing
+# output with $(...) forks a subshell, and these run on every single prompt.
+
+# SHELL-SPECIFIC IMPLEMENTATIONS -----------------------------------------------
 
 if [ -n "${ZSH_VERSION}" ]; then
-  _shellhistory_command_type() {
-    whence -w "$1" | cut -d' ' -f2
-  }
 
-  _shellhistory_last_command() {
+  _shellhistory_set_command() {
     # multi-line commands have prepended ';' (starting at line 2)
     # shellcheck disable=SC2154
-    echo "${history[$HISTCMD]}" | sed -e '2,$s/^/;/'
+    _SHELLHISTORY_COMMAND="$(echo "${history[$HISTCMD]}" | sed -e '2,$s/^/;/')"
+  }
+
+  _shellhistory_set_command_type() {
+    local type
+    _shellhistory_first_word
+    type="$(whence -w -- "${_SHELLHISTORY_WORD}" 2>/dev/null)"
+    _SHELLHISTORY_TYPE="${type##*: }"
   }
 
   _shellhistory_last_command_number() {
     # shellcheck disable=SC2086
     echo $HISTCMD
   }
+
 elif [ -n "${BASH_VERSION}" ]; then
-  _shellhistory_command_type() {
-    type -t "$1"
+
+  _shellhistory_set_command() {
+    # multi-line commands have prepended ';' (starting at line 2)
+    _SHELLHISTORY_COMMAND="$(fc -lnr -0 | sed -e '1s/^\t //;2,$s/^/;/')"
   }
 
-  _shellhistory_last_command() {
-    # multi-line commands have prepended ';' (starting at line 2)
-    fc -lnr -0 | sed -e '1s/^\t //;2,$s/^/;/'
+  _shellhistory_set_command_type() {
+    local type
+    _shellhistory_first_word
+    type="$(type -t "${_SHELLHISTORY_WORD}" 2>/dev/null)"
+    _SHELLHISTORY_TYPE="${type}"
   }
 
   _shellhistory_last_command_number() {
     fc -lr -0 | head -n1 | cut -f1
   }
+
 fi
+
+# HELPERS ----------------------------------------------------------------------
+
+# Sets _SHELLHISTORY_WORD to the first word of the command, ignoring leading
+# whitespace. Assigns rather than echoes so callers do not need a $(...) fork.
+# FIXME: what about "VAR=value command do something"?
+# See https://github.com/Pawamoy/shell-history/issues/13
+_shellhistory_first_word() {
+  local cmd word
+  cmd="${_SHELLHISTORY_COMMAND}"
+  word="${cmd#"${cmd%%[![:space:]]*}"}"
+  _SHELLHISTORY_WORD="${word%%[[:space:]]*}"
+}
 
 # shellcheck disable=SC2120
 _shellhistory_parents() {
@@ -44,26 +81,20 @@ _shellhistory_parents() {
 
 _shellhistory_time_now() {
   local now
-  now=$(date '+%s%N')
-  echo "${now:0:-3}"
+  now="$(date '+%s%N')"
+  _SHELLHISTORY_NOW="${now%???}"
 }
 
 _shellhistory_start_timer() {
-  _SHELLHISTORY_START_TIME=${_SHELLHISTORY_START_TIME:-$(_shellhistory_time_now)}
+  if [ -z "${_SHELLHISTORY_START_TIME}" ]; then
+    _shellhistory_time_now
+    _SHELLHISTORY_START_TIME="${_SHELLHISTORY_NOW}"
+  fi
 }
 
 _shellhistory_stop_timer() {
-  _SHELLHISTORY_STOP_TIME=$(_shellhistory_time_now)
-}
-
-_shellhistory_set_command() {
-  _SHELLHISTORY_COMMAND="$(_shellhistory_last_command)"
-}
-
-_shellhistory_set_command_type() {
-  # FIXME: what about "VAR=value command do something"?
-  # See https://github.com/Pawamoy/shell-history/issues/13
-  _SHELLHISTORY_TYPE="$(_shellhistory_command_type "${_SHELLHISTORY_COMMAND%% *}")"
+  _shellhistory_time_now
+  _SHELLHISTORY_STOP_TIME="${_SHELLHISTORY_NOW}"
 }
 
 _shellhistory_set_code() {
@@ -72,21 +103,18 @@ _shellhistory_set_code() {
 
 _shellhistory_set_pwd() {
   _SHELLHISTORY_PWD="${PWD}"
-  _SHELLHISTORY_PWD_B64="$(base64 -w0 <<<"${_SHELLHISTORY_PWD}")"
+  _SHELLHISTORY_PWD_B64="$(printf '%s' "${PWD}" | base64 -w0)"
 }
 
 _shellhistory_can_append() {
   local last_number
-  # shellcheck disable=SC2086
-  [ ${_SHELLHISTORY_BEFORE_DONE} -ne 1 ] && return 1
-  last_number=$(_shellhistory_last_command_number)
+  [ "${_SHELLHISTORY_BEFORE_DONE}" -ne 1 ] && return 1
+  last_number="$(_shellhistory_last_command_number)"
   if [ -n "${_SHELLHISTORY_PREVCMD_NUM}" ]; then
-    # shellcheck disable=SC2086
-    [ "${last_number}" -eq ${_SHELLHISTORY_PREVCMD_NUM} ] && return 1
-    _SHELLHISTORY_PREVCMD_NUM=${last_number}
-  else
-    _SHELLHISTORY_PREVCMD_NUM=${last_number}
+    [ "${last_number}" -eq "${_SHELLHISTORY_PREVCMD_NUM}" ] && return 1
   fi
+  _SHELLHISTORY_PREVCMD_NUM="${last_number}"
+  return 0
 }
 
 _shellhistory_append() {
@@ -113,8 +141,7 @@ _shellhistory_append_to_file() {
 }
 
 _shellhistory_before() {
-  # shellcheck disable=SC2086
-  [ ${_SHELLHISTORY_BEFORE_DONE} -gt 0 ] && return
+  [ "${_SHELLHISTORY_BEFORE_DONE}" -gt 0 ] && return
 
   _shellhistory_set_command
   _shellhistory_set_command_type
@@ -126,19 +153,19 @@ _shellhistory_before() {
 }
 
 _shellhistory_after() {
-  _shellhistory_set_code  # must always be done first
+  _shellhistory_set_code # must always be done first
   _shellhistory_stop_timer
 
-  [ ${_SHELLHISTORY_BEFORE_DONE} -eq 2 ] && _SHELLHISTORY_BEFORE_DONE=0
-  [ ${_SHELLHISTORY_AFTER_DONE} -eq 1 ] && return
+  [ "${_SHELLHISTORY_BEFORE_DONE}" -eq 2 ] && _SHELLHISTORY_BEFORE_DONE=0
+  [ "${_SHELLHISTORY_AFTER_DONE}" -eq 1 ] && return
 
   _shellhistory_append
-  unset _SHELLHISTORY_START_TIME
+  _SHELLHISTORY_START_TIME=
 
   _SHELLHISTORY_BEFORE_DONE=0
   _SHELLHISTORY_AFTER_DONE=1
 
-  return ${_SHELLHISTORY_CODE}
+  return "${_SHELLHISTORY_CODE}"
 }
 
 _shellhistory_get_debug_trap() {
@@ -156,10 +183,10 @@ _shellhistory_get_debug_trap() {
 _shellhistory_enable() {
   _SHELLHISTORY_BEFORE_DONE=2
   _SHELLHISTORY_AFTER_DONE=1
-  if [ "${ZSH_VERSION}" ]; then
+  if [ -n "${ZSH_VERSION}" ]; then
     preexec_functions+=(_shellhistory_before)
     precmd_functions=(_shellhistory_after "${precmd_functions[@]}")
-  elif [ "${BASH_VERSION}" ]; then
+  elif [ -n "${BASH_VERSION}" ]; then
     PROMPT_COMMAND="_shellhistory_after;${PROMPT_COMMAND}"
     # shellcheck disable=SC2064
     trap "$(_shellhistory_get_debug_trap)_shellhistory_before;" DEBUG
@@ -170,12 +197,12 @@ _shellhistory_disable() {
   local trap
   local new_prompt
   _SHELLHISTORY_AFTER_DONE=1
-  if [ "${ZSH_VERSION}" ]; then
+  if [ -n "${ZSH_VERSION}" ]; then
     # shellcheck disable=SC2206
     preexec_functions=(${preexec_functions:#_shellhistory_before})
     # shellcheck disable=SC2206
     precmd_functions=(${precmd_functions:#_shellhistory_after})
-  elif [ "${BASH_VERSION}" ]; then
+  elif [ -n "${BASH_VERSION}" ]; then
     trap="$(_shellhistory_get_debug_trap)"
     trap=${trap//_shellhistory_before;}
     new_prompt="${PROMPT_COMMAND//_shellhistory_after;}"
@@ -197,21 +224,23 @@ _shellhistory_help() {
 }
 
 # GLOBAL VARIABLES -------------------------------------------------------------
-_SHELLHISTORY_CODE=
+_SHELLHISTORY_CODE=0
 _SHELLHISTORY_COMMAND=
 _SHELLHISTORY_HOSTNAME="$(hostname)"
 _SHELLHISTORY_PARENTS="$(_shellhistory_parents)"
-_SHELLHISTORY_PARENTS_B64="$(echo "${_SHELLHISTORY_PARENTS}" | base64 -w0)"
+_SHELLHISTORY_PARENTS_B64="$(printf '%s' "${_SHELLHISTORY_PARENTS}" | base64 -w0)"
 _SHELLHISTORY_PWD=
 _SHELLHISTORY_PWD_B64=
 _SHELLHISTORY_START_TIME=
 _SHELLHISTORY_STOP_TIME=
 _SHELLHISTORY_TTY="$(tty)"
 _SHELLHISTORY_TYPE=
+_SHELLHISTORY_NOW=
+_SHELLHISTORY_WORD=
 _SHELLHISTORY_UUID="${_SHELLHISTORY_UUID:-$(uuidgen)}"
 
-_SHELLHISTORY_AFTER_DONE=
-_SHELLHISTORY_BEFORE_DONE=
+_SHELLHISTORY_AFTER_DONE=0
+_SHELLHISTORY_BEFORE_DONE=0
 _SHELLHISTORY_PREVCMD_NUM=
 
 SHELLHISTORY_FILE="${SHELLHISTORY_FILE:-$HOME/.shellhistory/history}"
@@ -225,6 +254,9 @@ shellhistory() {
     disable) _shellhistory_disable ;;
     enable) _shellhistory_enable ;;
     help) _shellhistory_help ;;
-    *) _shellhistory_usage >&2; return 1 ;;
+    *)
+      _shellhistory_usage >&2
+      return 1
+      ;;
   esac
 }
