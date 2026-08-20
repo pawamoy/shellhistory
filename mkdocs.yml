@@ -1,41 +1,55 @@
 site_name: "Shell History"
 site_description: "Visualize your usage of Bash/Zsh through a web app thanks to Flask and Highcharts!"
-site_url: "https://pawamoy.github.io/shell-history"
-repo_url: "https://github.com/pawamoy/shell-history"
+site_url: "https://pawamoy.github.io/shellhistory"
+repo_url: "https://github.com/pawamoy/shellhistory"
 repo_name: "pawamoy/shell-history"
 
 nav:
+- Home:
   - Overview: index.md
-  - API Reference:
-    - app.py: reference/app.md
-    - cli.py: reference/cli.md
-    - db.py: reference/db.md
     # - shellhistory.sh: reference/shellhistory.md
-  - Contributing: contributing.md
-  - Code of Conduct: code_of_conduct.md
   - Changelog: changelog.md
   - Credits: credits.md
+  - License: license.md
+- API Reference:
+  - app.py: reference/app.md
+  - cli.py: reference/cli.md
+  - db.py: reference/db.md
+- Development:
+  - Contributing: contributing.md
+  - Code of Conduct: code_of_conduct.md
+  - Coverage report: coverage.md
 
 theme:
   name: material
+  features:
+  - navigation.tabs
+  palette:
+    scheme: slate
+    primary: teal
+    accent: purple
 
 extra_css:
-  - css/mkdocstrings.css
+- css/mkdocstrings.css
 
 markdown_extensions:
-  - admonition
-  - codehilite:
-      guess_lang: false
-  - pymdownx.emoji
-  - pymdownx.magiclink
-  - pymdownx.superfences
-  - pymdownx.tabbed
-  - pymdownx.tasklist
-  - toc:
-      permalink: "¤"
+- admonition
+- pymdownx.emoji
+- pymdownx.magiclink
+- pymdownx.snippets:
+    check_paths: true
+- pymdownx.superfences
+- pymdownx.tabbed
+- pymdownx.tasklist
+- toc:
+    permalink: true
 
 plugins:
-  - search
-  - mkdocstrings:
-      watch:
-        - src/shellhistory
+- search
+- coverage:
+    html_report_dir: build/coverage
+- mkdocstrings:
+    watch:
+    - src/shellhistory
+- macros:
+    module_name: docs/macros

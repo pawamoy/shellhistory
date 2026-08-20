@@ -1,8 +1,15 @@
 # Shell History
 
-[![ci](https://github.com/pawamoy/shell-history/workflows/ci/badge.svg)](https://github.com/pawamoy/shell-history/actions?query=workflow%3Aci)
-[![documentation](https://img.shields.io/badge/docs-mkdocs%20material-blue.svg?style=flat)](https://pawamoy.github.io/shell-history/)
-[![pypi version](https://img.shields.io/pypi/v/shell-history.svg)](https://pypi.org/project/shell-history/)
+[% if repository_provider == "gitlab.com" -%]
+[![pipeline status](https://gitlab.com/[[ repository_namespace ]]/[[ repository_name ]]/badges/main/pipeline.svg)](https://gitlab.com/[[ repository_namespace ]]/[[ repository_name ]]/pipelines)
+[![coverage report](https://gitlab.com/[[ repository_namespace ]]/[[ repository_name ]]/badges/main/coverage.svg)](https://gitlab.com/[[ repository_namespace ]]/[[ repository_name ]]/commits/master)
+[% elif repository_provider == "github.com" -%]
+[![ci](https://github.com/[[ repository_namespace ]]/[[ repository_name ]]/workflows/ci/badge.svg)](https://github.com/[[ repository_namespace ]]/[[ repository_name ]]/actions?query=workflow%3Aci)
+[% endif -%]
+[![documentation](https://img.shields.io/badge/docs-mkdocs%20material-blue.svg?style=flat)](https://[[ repository_namespace ]].[[ repository_provider[:-4] ]].io/[[ repository_name ]]/)
+[![pypi version](https://img.shields.io/pypi/v/[[ repository_name ]].svg)](https://pypi.org/project/[[ repository_name ]]/)
+[![gitter](https://badges.gitter.im/join%20chat.svg)](https://gitter.im/[[ repository_name ]]/community)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
 Inspired by [bamos/zsh-history-analysis](https://github.com/bamos/zsh-history-analysis).
 
