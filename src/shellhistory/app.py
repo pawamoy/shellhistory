@@ -614,13 +614,21 @@ def type_json() -> Response:
     return jsonify(data)
 
 
+# Full command lines are unreadable in a cloud, so only the first word of each
+# command is kept, and only the most used ones: past a few hundred words the
+# cloud is too crowded to place them all.
+WORDCLOUD_WORDS = 150
+
+
 @app.route("/wordcloud_json")
 def wordcloud_json() -> Response:
-    """Return a sample of commands for the word cloud as JSON."""
+    """Return the most used commands (first word only) for the word cloud as JSON."""
     session = db.Session()
-    results = session.query(db.History.cmd).order_by(func.random()).limit(100)
-    text = " ".join(r[0] for r in results.all())
-    return jsonify(text)
+    results = session.query(db.History.cmd).all()
+    first_words = (cmd.split()[0] for (cmd,) in results if cmd and not cmd.isspace())
+    counter = Counter(first_words).most_common(WORDCLOUD_WORDS)
+    data = [{"name": word, "count": count} for word, count in counter]
+    return jsonify(data)
 
 
 @app.route("/yearly_json")
