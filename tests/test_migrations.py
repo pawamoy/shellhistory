@@ -26,7 +26,7 @@ from pathlib import Path
 
 import pytest
 
-from shellhistory import migrations
+from shellhistory._internal import _migrations as migrations
 
 LEGACY_SCHEMA = """
 CREATE TABLE history (
@@ -178,7 +178,7 @@ def test_legacy_text_import(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
         [
             sys.executable,
             "-c",
-            f"from shellhistory import migrations; r = migrations.import_file({str(path)!r}); print(r.inserted)",
+            f"from shellhistory._internal import _migrations as migrations; r = migrations.import_file({str(path)!r}); print(r.inserted)",
         ],
         capture_output=True,
         text=True,

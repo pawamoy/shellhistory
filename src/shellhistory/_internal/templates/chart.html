@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}{{ chart.title }}{% endblock %}
+
+{% block content %}
+  <h2 class="sh-title">{{ chart.title }}</h2>
+  {% if chart.about %}<p class="sh-about">{{ chart.about }}</p>{% endif %}
+  <div id="sh-controls" class="sh-controls"></div>
+  <p id="sh-status" class="sh-status" style="display:none;"></p>
+  {% for container in chart.containers %}
+    <div id="{{ container }}" class="sh-chart"></div>
+  {% endfor %}
+{% endblock %}
+
+{% block scripts %}
+  <script>window.CHART = {{ chart.options | tojson }};</script>
+  <script src="/static/js/{{ chart.script or 'chart' }}.js"></script>
+{% endblock %}

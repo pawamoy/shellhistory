@@ -52,7 +52,10 @@ def get_parser() -> argparse.ArgumentParser:
     Returns:
         An argparse parser.
     """
-    parser = argparse.ArgumentParser(prog="shellhistory")
+    parser = argparse.ArgumentParser(
+        prog="shellhistory",
+        epilog="subcommands: secrets (scan command history for credentials)",
+    )
     parser.add_argument("-V", "--version", action="version", version=f"%(prog)s {debug._get_version()}")
     parser.add_argument("--debug-info", action=_DebugInfo, help="Print debug information.")
 
@@ -92,6 +95,10 @@ def main(args: list[str] | None = None) -> int:
     Returns:
         An exit code.
     """
+    args = sys.argv[1:] if args is None else args
+    if args and args[0] == "secrets":
+        return _secrets_command(args[1:])
+
     parser = get_parser()
     opts = parser.parse_args(args=args)
 
@@ -105,6 +112,61 @@ def main(args: list[str] | None = None) -> int:
         return import_legacy(opts.file)
 
     parser.print_help()
+    return 0
+
+
+def _secrets_command(args: list[str] | None = None) -> int:
+    """Scan commands with Gitleaks and optionally redact detected credentials.
+
+    Parameters:
+        args: Arguments after the `secrets` subcommand.
+
+    Returns:
+        An exit code.
+    """
+    parser = argparse.ArgumentParser(
+        prog="shellhistory secrets",
+        description="Scan command history locally with Gitleaks without printing secret values.",
+    )
+    parser.add_argument(
+        "--apply",
+        action="store_true",
+        help="Redact findings, save scan states, VACUUM the database, and truncate its WAL.",
+    )
+    parser.add_argument(
+        "--rescan",
+        action="store_true",
+        help="Scan rows that already have a clean or redacted scan state.",
+    )
+    parser.add_argument("--batch-size", type=int, default=500, help="Commands sent to each Gitleaks process.")
+    parser.add_argument("--gitleaks", default="gitleaks", help="Path to the Gitleaks executable.")
+    parser.add_argument("--timeout", type=int, default=120, help="Seconds allowed for each batch.")
+    opts = parser.parse_args(args=args)
+
+    from shellhistory._internal import _db as db  # noqa: PLC0415
+    from shellhistory._internal import _secrets  # noqa: PLC0415
+
+    db.engine.dispose()
+    try:
+        report = _secrets._scan_database(
+            db.DB_PATH,
+            apply=opts.apply,
+            rescan=opts.rescan,
+            batch_size=opts.batch_size,
+            executable=opts.gitleaks,
+            timeout=opts.timeout,
+        )
+    except (OSError, ValueError, _secrets._SecretsError) as error:
+        print(f"secret scan failed: {error}", file=sys.stderr)
+        return 1
+
+    print(f"scanned {report.scanned} commands; found {report.findings} findings in {report.flagged} commands")
+    for rule, count in report.rule_counts.items():
+        print(f"  {rule}: {count} commands")
+    if opts.apply:
+        print(f"redacted {report.redacted} commands")
+    elif report.flagged:
+        print("dry run: run `shellhistory secrets --apply` to redact these findings")
     return 0
 
 
@@ -126,7 +188,7 @@ def web() -> int:
     """
     # Imported here, not at module level: `shellhistory-location` runs from every
     # shell's startup file, and it must not pay for importing Flask.
-    from shellhistory.app import app  # noqa: PLC0415
+    from shellhistory._internal._app import app  # noqa: PLC0415
 
     app.run()
     return 0
@@ -138,7 +200,8 @@ def migrate() -> int:
     Returns:
         An exit code.
     """
-    from shellhistory import db, migrations  # noqa: PLC0415
+    from shellhistory._internal import _db as db  # noqa: PLC0415
+    from shellhistory._internal import _migrations as migrations  # noqa: PLC0415
 
     if not db.is_legacy_schema():
         print(f"{db.DB_PATH} is already on the current schema, nothing to do.")
@@ -159,7 +222,7 @@ def import_legacy(path: str | None = None) -> int:
     Returns:
         An exit code.
     """
-    from shellhistory import migrations  # noqa: PLC0415
+    from shellhistory._internal import _migrations as migrations  # noqa: PLC0415
 
     report = migrations.import_file(path) if path else migrations.import_history()
     print(f"imported {report.inserted} records ({report.duplicates} already present)")

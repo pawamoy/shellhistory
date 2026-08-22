@@ -1,0 +1,218 @@
+body {
+  font-size: 14px;
+}
+
+footer {
+  margin: 30px 0 20px;
+  color: #888;
+}
+
+/* Sidebar --------------------------------------------------------------- */
+#sidebar {
+  border-right: 1px solid #eee;
+  padding-bottom: 30px;
+}
+
+#sidebar h5 {
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: #999;
+  font-weight: 700;
+  margin: 18px 0 6px;
+}
+
+#sidebar ul {
+  margin-bottom: 0;
+}
+
+#sidebar li a {
+  display: block;
+  padding: 2px 6px;
+  border-radius: 3px;
+  color: #337ab7;
+}
+
+#sidebar li a:hover {
+  background: #f5f5f5;
+  text-decoration: none;
+}
+
+#sidebar li.active a {
+  background: #337ab7;
+  color: #fff;
+}
+
+/* Chart pages ------------------------------------------------------------ */
+#main {
+  padding-bottom: 40px;
+}
+
+.sh-title {
+  margin-top: 10px;
+}
+
+.sh-about {
+  color: #777;
+  max-width: 60em;
+}
+
+.sh-chart {
+  min-width: 320px;
+  height: 440px;
+  margin: 0 auto 30px;
+}
+
+.sh-calendar-year {
+  height: 170px;
+  margin-bottom: 4px;
+}
+
+.sh-empty {
+  color: #999;
+  font-style: italic;
+  padding: 40px 0;
+  text-align: center;
+}
+
+.sh-status {
+  color: #777;
+  padding: 6px 0;
+}
+
+.sh-table {
+  max-width: 40em;
+}
+
+/* The filter bar --------------------------------------------------------- */
+.sh-controls {
+  background: #fafafa;
+  border: 1px solid #eee;
+  border-radius: 4px;
+  padding: 8px 10px 4px;
+  margin-bottom: 16px;
+}
+
+.sh-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+}
+
+.sh-row + .sh-row {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed #e5e5e5;
+}
+
+.sh-controls label {
+  font-weight: 400;
+  color: #666;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.sh-controls select,
+.sh-controls input[type="text"],
+.sh-controls input[type="date"] {
+  display: inline-block;
+  width: auto;
+  max-width: 16em;
+}
+
+.sh-controls a {
+  font-size: 12px;
+}
+
+/* The home page ---------------------------------------------------------- */
+#welcome-title {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.sh-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.sh-tile {
+  flex: 1 1 150px;
+  background: #fafafa;
+  border: 1px solid #eee;
+  border-radius: 4px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+}
+
+.sh-tile-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: #333;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sh-tile-label {
+  font-size: 12px;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+/* Importing a legacy history file ---------------------------------------- */
+#import-close {
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 1;
+  color: #000;
+  text-shadow: 0 1px 0 #fff;
+  opacity: .2;
+  cursor: pointer;
+}
+
+#import-close:hover {
+  text-decoration: none;
+}
+
+#import-alert {
+  padding: 15px;
+  margin-bottom: 20px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+}
+
+#import-alert.danger {
+  color: #a94442;
+  background-color: #f2dede;
+  border-color: #ebccd1;
+}
+
+#import-alert.info {
+  color: #31708f;
+  background-color: #d9edf7;
+  border-color: #bce8f1;
+}
+
+#import-alert.success {
+  color: #3c763d;
+  background-color: #dff0d8;
+  border-color: #d6e9c6;
+}
+
+#import-alert.warning {
+  color: #8a6d3b;
+  background-color: #fcf8e3;
+  border-color: #faebcc;
+}
+
+#import-alert.default {
+  color: grey;
+  background-color: #f5f5f5;
+  border-color: #e3e3e3;
+}

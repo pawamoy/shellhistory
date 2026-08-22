@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}Home{% endblock %}
+
+{% block content %}
+  <h2 id="welcome-title">Your shell, nine ways from Sunday</h2>
+  <div id="stats" class="sh-tiles"></div>
+  <div class="row">
+    <div class="col-md-7"><div id="punchcard" class="sh-chart"></div></div>
+    <div class="col-md-5"><div id="container" class="sh-chart"></div></div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  <script src="/static/js/home.js"></script>
+{% endblock %}

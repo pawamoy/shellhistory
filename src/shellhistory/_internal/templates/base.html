@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Shell History{% endblock %} - Shell History</title>
+  <link rel="stylesheet" href="/static/css/home.css">
+  <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+  <script src="https://code.highcharts.com/12.6.0/highcharts.js"></script>
+  <script src="https://code.highcharts.com/12.6.0/highcharts-more.js"></script>
+  <script src="https://code.highcharts.com/12.6.0/modules/heatmap.js"></script>
+  <script src="https://code.highcharts.com/12.6.0/modules/treemap.js"></script>
+  <script src="https://code.highcharts.com/12.6.0/modules/wordcloud.js"></script>
+  <script src="https://code.highcharts.com/12.6.0/modules/exporting.js"></script>
+  <script src="/static/js/sh.js"></script>
+  {% block head %}{% endblock %}
+</head>
+<body>
+<header>
+  <nav class="navbar navbar-default navbar-static-top">
+    <div class="container-fluid">
+      <div class="navbar-header">
+        <button type="button" class="navbar-toggle collapsed" data-toggle="collapse"
+                data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+          <span class="sr-only">Toggle navigation</span>
+          <span class="icon-bar"></span><span class="icon-bar"></span><span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand" href="/">Shell History</a>
+      </div>
+      <div id="navbar" class="navbar-collapse collapse">
+        <ul class="nav navbar-nav">
+          <li{% if not chart %} class="active"{% endif %}><a href="/">Home</a></li>
+          <li><a href="/admin/history">Admin</a></li>
+          <li><a href="#" id="import-button">Import legacy history file</a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+</header>
+<section id="content" class="container-fluid">
+  <div class="row">
+    <div class="col-md-2" id="sidebar">
+      {% for group, entries in navigation %}
+        <h5>{{ group }}</h5>
+        <ul class="list-unstyled">
+          {% for entry in entries %}
+            <li{% if chart and chart.slug == entry.slug %} class="active"{% endif %}>
+              <a href="/{{ entry.slug }}">{{ entry.title }}</a>
+            </li>
+          {% endfor %}
+        </ul>
+      {% endfor %}
+    </div>
+    <div class="col-md-10" id="main">
+      <div id="import" class="row">
+        <div class="col-md-12">
+          <div id="import-alert" style="display:none;">
+            <p id="import-message" style="display:inline; white-space:pre-line;"></p>
+            <a id="import-close"><span aria-hidden="true">&times;</span></a>
+          </div>
+        </div>
+      </div>
+      {% block content %}{% endblock %}
+    </div>
+  </div>
+</section>
+<footer id="footer" class="container-fluid">
+  <em>&copy; Copyright 2017-2026 by Timothée Mazzucotelli.
+    Source code on <a href="https://github.com/pawamoy/shellhistory">GitHub</a>.</em>
+</footer>
+<script src="/static/js/import.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

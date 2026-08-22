@@ -23,8 +23,10 @@ import tempfile
 from pathlib import Path
 
 # `db` resolves the database path at import time, so this has to happen before
-# any test module imports the package. Without it a test run would open -- and
-# `create_tables` would write to -- the developer's own history database.
+# any test module imports the package. These assignments must be unconditional:
+# developers normally export SHELLHISTORY_DB for the recorder, and preserving
+# that value here would let destructive fixtures touch their real history.
 _TMP = Path(tempfile.mkdtemp(prefix="shellhistory-tests-"))
-os.environ.setdefault("SHELLHISTORY_DB", str(_TMP / "db.sqlite3"))
-os.environ.setdefault("SHELLHISTORY_FILE", str(_TMP / "history"))
+os.environ["SHELLHISTORY_DB"] = str(_TMP / "db.sqlite3")
+os.environ["SHELLHISTORY_FILE"] = str(_TMP / "history")
+os.environ["SHELLHISTORY_TEST_ROOT"] = str(_TMP)

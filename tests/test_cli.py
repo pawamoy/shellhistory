@@ -20,10 +20,12 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from shellhistory import main
-from shellhistory._internal import debug
+from shellhistory._internal import _secrets, debug
 
 
 def test_main() -> None:
@@ -68,3 +70,39 @@ def test_show_debug_info(capsys: pytest.CaptureFixture) -> None:
     assert "system" in captured
     assert "environment" in captured
     assert "packages" in captured
+
+
+def test_secrets_subcommand_is_a_dry_run_by_default(
+    capsys: pytest.CaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Do not expose findings or mutate commands without --apply."""
+    called = {}
+
+    def scan_database(*_args: Any, **kwargs: Any) -> _secrets._ScanSummary:
+        called.update(kwargs)
+        return _secrets._ScanSummary(10, 2, 3, 0, {"github-pat": 2})
+
+    monkeypatch.setattr(_secrets, "_scan_database", scan_database)
+    assert main(["secrets", "--batch-size", "25"]) == 0
+    captured = capsys.readouterr()
+    assert "found 3 findings in 2 commands" in captured.out
+    assert "dry run" in captured.out
+    assert called["apply"] is False
+    assert called["batch_size"] == 25
+
+
+def test_secrets_subcommand_reports_scanner_errors_without_secret_output(
+    capsys: pytest.CaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Scanner diagnostics can contain findings, so only show our safe exception."""
+
+    def scan_database(*_args: Any, **_kwargs: Any) -> _secrets._ScanSummary:
+        raise _secrets._SecretsError("Gitleaks failed with exit status 2")
+
+    monkeypatch.setattr(_secrets, "_scan_database", scan_database)
+    assert main(["secrets", "--apply"]) == 1
+    captured = capsys.readouterr()
+    assert "exit status 2" in captured.err
+    assert "Secret" not in captured.err

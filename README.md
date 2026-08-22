@@ -52,6 +52,35 @@ Now go to [http://localhost:5000/](http://localhost:5000/) and enjoy!
 
 You will need Internet connection since assets are not bundled.
 
+### Filtering and splitting
+
+Every chart is served by the same mechanism, so all of them take the same
+query string. Pick one machine, or one terminal, or one project, and every
+chart narrows to it; ask for a split, and it comes back as one series per
+value of that dimension instead of one:
+
+| Parameter | What it does |
+| --- | --- |
+| `split=host` | one series per machine — also `user`, `shell`, `level`, `status`, `type` |
+| `split=env` | one series per place the shell was typed — also `terminal`, `editor`, `wm`, `multiplexer`, `location`, `display_manager`, `container` |
+| `host=corsair` | keep only that value; works for every dimension above |
+| `path=/home/me/dev/thing` | keep only the commands run under that directory |
+| `cmd=git` | keep only the command lines starting with that |
+| `since=2024-01-01`, `until=2024-12-31` | keep only that span |
+| `granularity=day` | the bucket of the charts reported over time: `day`, `week`, `month`, `year` |
+| `normalize=1` | report each series as a share of its own total, so a busy machine and a quiet one can be compared |
+
+The same controls sit in a bar above every chart, so none of this has to be
+typed by hand.
+
+### What the environment charts know
+
+The shell records the whole chain of processes above it, which turns out to
+name the terminal emulator, the editor hosting that terminal, the window
+manager, the display manager, the multiplexer, and whether an `sshd` sits in
+between. None of that is stored a second time: a whole database holds only a
+couple of thousand distinct ancestries, so they are read on the fly.
+
 ## Some technical info
 
 ### How it works
@@ -73,16 +102,51 @@ After the command has finished, we store the return code, and stop the timer.
 
 Records go straight into a SQLite database (`~/.shellhistory/db.sqlite3` by
 default, `$SHELLHISTORY_DB` to override). At the end of each command the shell
-spawns a small detached writer, `record.py`, which uses nothing but the standard
+spawns a small detached writer, `_record.py`, which uses nothing but the standard
 library and never makes the prompt wait on it.
 
-The schema has two tables. Everything that stays the same for the whole life of
-a shell -- host, user, tty, shell, level and the process ancestry -- is written
-once into `sessions`; `history` holds what changes per command (start, stop,
-type, return code, working directory, the command itself) and points at its
-session. The ancestry string alone is a few hundred bytes and there are only a
-couple of thousand distinct ones, so repeating it on every row used to account
-for half the database file.
+### Secret scanning and redaction
+
+Install [Gitleaks](https://github.com/gitleaks/gitleaks), then scan recorded
+commands locally without changing them:
+
+```console
+shellhistory secrets
+```
+
+The report only prints counts, row totals, and rule names: it never prints
+commands or detected values. Review the dry-run totals, close the web app and
+other processes holding the database open, then apply the redactions:
+
+```console
+shellhistory secrets --apply
+```
+
+Commands are sent to Gitleaks in batches (500 by default). Provider-specific
+Gitleaks rules are extended with rules for shell options, authorization headers,
+credentials in URLs, and common short password options. A canary in every batch
+makes the scan fail rather than silently marking rows clean when Gitleaks or its
+configuration is broken.
+
+Applied scans record each row as `clean` or `redacted` in `secret_scans`; commands
+without a record are unscanned. Later scans skip recorded rows, so use
+`shellhistory secrets --rescan` (or add `--apply`) after upgrading Gitleaks or
+changing scanner rules. Redaction replaces only the extracted value with
+`[REDACTED]`; if a finding cannot be mapped back to an exact value, the whole
+command is redacted instead.
+
+An applied scan enables SQLite secure deletion, vacuums the database, and
+truncates its write-ahead log. Copies and backups made before the scan remain
+sensitive, and detected credentials should still be rotated.
+
+The schema has three tables. Everything that stays the same for the whole life
+of a shell -- host, user, tty, shell, level and the process ancestry -- is
+written once into `sessions`; `history` holds what changes per command (start,
+stop, type, return code, working directory, the command itself) and points at
+its session; `secret_scans` optionally records the latest scan state for a
+history row. The ancestry string alone is a few hundred bytes and there are
+only a couple of thousand distinct ones, so repeating it on every row used to
+account for half the database file.
 
 Values are passed to the writer as separate arguments and bound as query
 parameters, so nothing in a command line can be mistaken for a field separator

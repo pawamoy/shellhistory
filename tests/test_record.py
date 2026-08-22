@@ -27,9 +27,9 @@ from pathlib import Path
 
 import pytest
 
-from shellhistory import record
+from shellhistory._internal import _record as record
 
-RECORD = Path(__file__).parent.parent / "src" / "shellhistory" / "record.py"
+RECORD = Path(__file__).parent.parent / "src" / "shellhistory" / "_internal" / "_record.py"
 
 
 def normalize(sql: str) -> str:
@@ -139,12 +139,12 @@ def test_replaying_the_same_record_is_a_no_op(db_path: str) -> None:
 
 
 def test_schema_matches_the_sqlalchemy_models(db_path: str, tmp_path: Path) -> None:
-    """record.py writes its own DDL, so it must not drift from the models."""
+    """_record.py writes its own DDL, so it must not drift from the models."""
     write(db_path)
 
     from_models = str(tmp_path / "models.sqlite3")
     subprocess.run(
-        [sys.executable, "-c", "from shellhistory import db; db.create_tables()"],
+        [sys.executable, "-c", "from shellhistory._internal import _db; _db.create_tables()"],
         env={**os.environ, "SHELLHISTORY_DB": from_models, "SHELLHISTORY_FILE": os.devnull},
         check=True,
     )

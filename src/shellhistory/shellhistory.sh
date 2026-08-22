@@ -12,7 +12,7 @@
 # They assign to variables rather than writing to stdout on purpose: capturing
 # output with $(...) forks a subshell, and these run on every single prompt.
 #
-# Finished records go straight into the SQLite database, written by record.py in
+# Finished records go straight into the SQLite database, written by _internal/_record.py in
 # a detached background process so the prompt never waits on it. Values are
 # passed as separate arguments and bound as query parameters, so nothing in a
 # command line can be mistaken for anything else -- which is also why none of
@@ -27,7 +27,7 @@ if [ -n "${ZSH_VERSION}" ]; then
 elif [ -n "${BASH_VERSION}" ]; then
   _SHELLHISTORY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 fi
-_SHELLHISTORY_RECORDER="${SHELLHISTORY_RECORDER:-${_SHELLHISTORY_DIR}/record.py}"
+_SHELLHISTORY_RECORDER="${SHELLHISTORY_RECORDER:-${_SHELLHISTORY_DIR}/_internal/_record.py}"
 _SHELLHISTORY_PYTHON="${SHELLHISTORY_PYTHON:-python3}"
 
 # SHELL-SPECIFIC IMPLEMENTATIONS -----------------------------------------------
@@ -344,7 +344,7 @@ _shellhistory_append() {
   fi
 }
 
-# Hand the record to record.py and return immediately: the prompt must never
+# Hand the record to _record.py and return immediately: the prompt must never
 # wait on a database write.
 _shellhistory_record() {
   _shellhistory_spawn \
