@@ -14,7 +14,7 @@ $(function () {
     });
     Highcharts.chart("worst", {
       chart: { type: "bar" },
-      colors: SH.palette,
+      palette: { colors: SH.palette },
       title: { text: "The programs that take more than one go" },
       subtitle: { text: "Share of chains that needed a second attempt" },
       xAxis: { categories: data.worst.categories },

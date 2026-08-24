@@ -8,6 +8,15 @@
 var SH = (function ($) {
   "use strict";
 
+  // Keep the supporting text readable instead of inheriting Highcharts' small
+  // relative defaults for subtitles and axis labels.
+  Highcharts.setOptions({
+    chart: { style: { fontSize: "1.125rem" } },
+    subtitle: { style: { fontSize: "1rem" } },
+    xAxis: { labels: { style: { fontSize: "1rem" } } },
+    yAxis: { labels: { style: { fontSize: "1rem" } } }
+  });
+
   var params = new URLSearchParams(window.location.search);
   var meta = null;
   var page = null;
@@ -165,7 +174,7 @@ var SH = (function ($) {
     if (spec.xLabels) { axis.labels = spec.xLabels; }
     return {
       chart: { type: spec.type || "column", zoomType: "x" },
-      colors: PALETTE,
+      palette: { colors: PALETTE },
       title: { text: spec.title || null },
       subtitle: { text: spec.subtitle || null },
       xAxis: axis,

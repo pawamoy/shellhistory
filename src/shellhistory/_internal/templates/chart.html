@@ -8,7 +8,7 @@
   <div id="sh-controls" class="sh-controls"></div>
   <p id="sh-status" class="sh-status" style="display:none;"></p>
   {% for container in chart.containers %}
-    <div id="{{ container }}" class="sh-chart"></div>
+    <div id="{{ container }}" class="sh-chart{% if chart.script == 'markov' %} sh-markov-chart{% endif %}"></div>
   {% endfor %}
 {% endblock %}
 

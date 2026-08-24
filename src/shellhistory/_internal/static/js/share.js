@@ -8,7 +8,7 @@ $(function () {
     }
     Highcharts.chart("container", {
       chart: { type: "pie" },
-      colors: SH.palette,
+      palette: { colors: SH.palette },
       title: { text: page.spec.title },
       subtitle: {
         text: data.split

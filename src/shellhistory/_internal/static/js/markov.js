@@ -7,12 +7,17 @@ $(function () {
       return;
     }
     Highcharts.chart("container", {
-      chart: { type: "heatmap", height: Math.max(500, data.categories.length * 22) },
+      chart: { type: "heatmap" },
       title: { text: page.spec.title },
       subtitle: { text: "Read a cell as: the command on the left was followed by the one below" },
       xAxis: { categories: data.categories, opposite: true, labels: { rotation: -45 } },
       yAxis: { categories: data.categories, title: null, reversed: true },
-      colorAxis: { min: 0, minColor: "#ffffff", maxColor: SH.palette[0] },
+      colorAxis: {
+        min: 1,
+        minColor: "#dbeaf7",
+        maxColor: SH.palette[0],
+        type: "logarithmic"
+      },
       legend: { align: "right", layout: "vertical", verticalAlign: "middle", symbolHeight: 300 },
       tooltip: {
         formatter: function () {

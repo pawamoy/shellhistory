@@ -8,7 +8,7 @@ $(function () {
     }
     Highcharts.chart("container", {
       chart: { type: "boxplot" },
-      colors: SH.palette,
+      palette: { colors: SH.palette },
       title: { text: page.spec.title },
       subtitle: { text: "Whiskers at the 5th and 95th percentiles" },
       xAxis: {

@@ -62,6 +62,13 @@ footer {
   margin: 0 auto 30px;
 }
 
+.sh-markov-chart {
+  aspect-ratio: 1 / 1;
+  height: auto;
+  max-width: 800px;
+  min-height: 500px;
+}
+
 .sh-calendar-year {
   height: 170px;
   margin-bottom: 4px;

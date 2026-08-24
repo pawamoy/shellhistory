@@ -15,7 +15,7 @@ $(function () {
     });
     Highcharts.chart("share", {
       chart: { type: "pie", height: 320 },
-      colors: SH.palette,
+      palette: { colors: SH.palette },
       title: { text: "In total" },
       tooltip: { pointFormat: "<b>{point.y}</b> commands ({point.percentage:.1f} %)" },
       plotOptions: { pie: { dataLabels: { format: "{point.name}: {point.percentage:.1f} %" }, animation: false } },

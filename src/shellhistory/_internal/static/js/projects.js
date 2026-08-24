@@ -18,7 +18,7 @@ $(function () {
 
     Highcharts.chart("totals", {
       chart: { type: "bar", height: 420 },
-      colors: SH.palette,
+      palette: { colors: SH.palette },
       title: { text: "In total" },
       xAxis: { categories: data.totals.map(function (entry) { return entry.name; }) },
       yAxis: { min: 0, title: { text: "Commands" } },

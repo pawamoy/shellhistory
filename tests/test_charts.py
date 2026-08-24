@@ -244,8 +244,34 @@ def test_chart_library_version_is_pinned(client: FlaskClient) -> None:
     """Do not let a breaking CDN release change the app without a code change."""
     page = client.get("/yearly").get_data(as_text=True)
 
-    assert "code.highcharts.com/12.6.0/highcharts.js" in page
+    assert "code.highcharts.com/13.0.1/highcharts.js" in page
+    assert page.count("code.highcharts.com/13.0.1/") == 6
     assert 'src="https://code.highcharts.com/highcharts.js"' not in page
+
+
+def test_charts_use_a_readable_type_scale(client: FlaskClient) -> None:
+    shared = client.get("/static/js/sh.js").get_data(as_text=True)
+    calendar = client.get("/static/js/calendar.js").get_data(as_text=True)
+
+    assert 'fontSize: "1.125rem"' in shared
+    assert shared.count('fontSize: "1rem"') == 3
+    assert 'fontSize: "16px"' in calendar
+    assert 'fontSize: "11px"' not in calendar
+
+
+def test_calendar_logarithmic_color_axis_starts_above_zero(client: FlaskClient) -> None:
+    script = client.get("/static/js/calendar.js").get_data(as_text=True)
+
+    assert 'colorAxis: { min: 1, max: data.max' in script
+    assert 'type: "logarithmic"' in script
+
+
+def test_markov_low_counts_remain_visible(client: FlaskClient) -> None:
+    script = client.get("/static/js/markov.js").get_data(as_text=True)
+
+    assert "min: 1" in script
+    assert 'minColor: "#dbeaf7"' in script
+    assert 'type: "logarithmic"' in script
 
 
 @pytest.mark.parametrize(
@@ -400,3 +426,16 @@ def test_every_chart_page_names_a_script_that_exists() -> None:
     folder = __import__("pathlib").Path(app.root_path) / "static" / "js"
     missing = sorted(name for name in scripts if not (folder / f"{name}.js").is_file())
     assert not missing
+
+
+@pytest.mark.parametrize("slug", ["markov", "markov_full"])
+def test_markov_charts_use_their_square_container(client: FlaskClient, slug: str) -> None:
+    page = client.get(f"/{slug}").get_data(as_text=True)
+    css = client.get("/static/css/home.css").get_data(as_text=True)
+    script = client.get("/static/js/markov.js").get_data(as_text=True)
+
+    assert 'class="sh-chart sh-markov-chart"' in page
+    assert "aspect-ratio: 1 / 1" in css
+    assert "height: auto" in css
+    assert "max-width: 800px" in css
+    assert "data.categories.length * 22" not in script

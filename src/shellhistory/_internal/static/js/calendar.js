@@ -38,10 +38,10 @@ $(function () {
       var element = $("<div>").addClass("sh-calendar-year").appendTo(host)[0];
       Highcharts.chart(element, {
         chart: { type: "heatmap", height: 170, marginTop: 30, marginBottom: 20 },
-        title: { text: String(year), align: "left", style: { fontSize: "14px" } },
+        title: { text: String(year), align: "left", style: { fontSize: "16px" } },
         xAxis: { min: 0, max: 53, visible: false },
-        yAxis: { categories: DAYS, title: null, reversed: true, labels: { style: { fontSize: "9px" } } },
-        colorAxis: { min: 0, max: data.max, minColor: "#eeeeee", maxColor: SH.palette[2], type: "logarithmic" },
+        yAxis: { categories: DAYS, title: null, reversed: true },
+        colorAxis: { min: 1, max: data.max, minColor: "#eeeeee", maxColor: SH.palette[2], type: "logarithmic" },
         legend: { enabled: false },
         tooltip: {
           formatter: function () {
