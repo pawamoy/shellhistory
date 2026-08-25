@@ -30,7 +30,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator, Sequence
+    from collections.abc import Callable, Iterator, Sequence
 
 _CANARY = "shellhistory-gitleaks-canary-4e39b23a"
 
@@ -123,6 +123,10 @@ class _SecretsError(RuntimeError):
     pass
 
 
+class _CrossCommandFindingError(_SecretsError):
+    """A batched finding cannot be safely attributed to one history row."""
+
+
 @dataclass(frozen=True)
 class _Row:
     id: int
@@ -140,12 +144,22 @@ class _RowScan:
 
 
 @dataclass(frozen=True)
+class _ReviewDecision:
+    """The action chosen for one finding during interactive review."""
+
+    status: str
+    redacted: str | None = None
+
+
+@dataclass(frozen=True)
 class _ScanSummary:
     scanned: int
     flagged: int
     findings: int
     redacted: int
     rule_counts: dict[str, int]
+    kept: int = 0
+    skipped: int = 0
 
 
 def _batches(
@@ -271,7 +285,7 @@ def _owner(finding: dict[str, Any], rows: Sequence[_Row], owners: Sequence[int |
     except (KeyError, TypeError, ValueError, IndexError) as error:
         raise _SecretsError("Gitleaks returned a finding with an invalid location") from error
     if start_owner is None or start_owner != end_owner:
-        raise _SecretsError("Gitleaks returned a finding that crossed command boundaries")
+        raise _CrossCommandFindingError("Gitleaks returned a finding that crossed command boundaries")
     return next(row for row in rows if row.id == start_owner)
 
 
@@ -298,12 +312,30 @@ def _redact(text: str, spans: Sequence[tuple[int, int]]) -> str:
     return text
 
 
-def _scan_batch(rows: Sequence[_Row], *, executable: str, timeout: int) -> list[_RowScan]:
+def _scan_batch(
+    rows: Sequence[_Row],
+    *,
+    executable: str,
+    timeout: int,
+) -> list[_RowScan]:
     findings = _run_gitleaks(rows, executable=executable, timeout=timeout)
     _, owners = _payload(rows)
     by_id: dict[int, list[dict[str, Any]]] = {row.id: [] for row in rows}
-    for finding in findings:
-        by_id[_owner(finding, rows, owners).id].append(finding)
+    try:
+        for finding in findings:
+            by_id[_owner(finding, rows, owners).id].append(finding)
+    except _CrossCommandFindingError:
+        if len(rows) == 1:
+            raise
+        # A rule can unexpectedly include our record separator (for example,
+        # after a Gitleaks rule-set change).  Never guess which row owns that
+        # finding: split the batch until the offending commands are isolated.
+        middle = len(rows) // 2
+        return _scan_batch(rows[:middle], executable=executable, timeout=timeout) + _scan_batch(
+            rows[middle:],
+            executable=executable,
+            timeout=timeout,
+        )
 
     scans = []
     for row in rows:
@@ -334,24 +366,60 @@ def _scan_batch(rows: Sequence[_Row], *, executable: str, timeout: int) -> list[
     return scans
 
 
-def _stage(connection: sqlite3.Connection, scans: Sequence[_RowScan], *, key: bytes) -> None:
-    rows = [
-        (
-            scan.row.id,
-            hmac.digest(key, scan.row.cmd.encode(), "sha256"),
-            scan.redacted if scan.findings else None,
-            "redacted" if scan.findings or scan.row.status == "redacted" else "clean",
-            json.dumps(scan.rules or scan.row.rules, separators=(",", ":")),
-            int(bool(scan.findings)),
+def _stage(
+    connection: sqlite3.Connection,
+    scans: Sequence[_RowScan],
+    *,
+    key: bytes,
+    decisions: dict[int, _ReviewDecision] | None = None,
+) -> None:
+    """Stage scan results, optionally using a per-finding review decision.
+
+    Kept findings are deliberately distinct from ``clean`` so intentional
+    exceptions remain visible while preventing another scan. Skipped findings
+    are omitted entirely, leaving any existing scan state unchanged.
+    """
+    decisions = decisions or {}
+    rows = []
+    for scan in scans:
+        if scan.findings:
+            decision = decisions.get(scan.row.id, _ReviewDecision("redacted", scan.redacted))
+            if decision.status == "skip":
+                continue
+            status = decision.status
+            command = decision.redacted if status == "redacted" else None
+        else:
+            status = "redacted" if scan.row.status == "redacted" else "clean"
+            command = None
+        rows.append(
+            (
+                scan.row.id,
+                hmac.digest(key, scan.row.cmd.encode(), "sha256"),
+                command,
+                status,
+                json.dumps(scan.rules or scan.row.rules, separators=(",", ":")),
+                int(status == "redacted" and bool(scan.findings)),
+            ),
         )
-        for scan in scans
-    ]
     with connection:
         connection.executemany(
             """INSERT INTO secret_scan_stage
                (history_id, command_mac, redacted, status, rules, new_redaction) VALUES (?,?,?,?,?,?)""",
             rows,
         )
+
+
+def _review_decision(scan: _RowScan, *, result: bool | str | None) -> _ReviewDecision:
+    """Normalize legacy boolean and interactive review results."""
+    if result is True:
+        return _ReviewDecision("redacted", scan.redacted)
+    if result is False:
+        return _ReviewDecision("kept")
+    if result is None:
+        return _ReviewDecision("skip")
+    if isinstance(result, str):
+        return _ReviewDecision("redacted", result)
+    raise _SecretsError("review callback must return apply, redact, keep, or skip")
 
 
 def _apply_staged(connection: sqlite3.Connection, *, key: bytes, scanner: str) -> int:
@@ -410,7 +478,15 @@ def _scan_database(
     batch_size: int = 500,
     executable: str = "gitleaks",
     timeout: int = 120,
+    review: Callable[[_RowScan], bool | str | None] | None = None,
 ) -> _ScanSummary:
+    """Scan a database and optionally review individual findings.
+
+    When ``review`` is supplied, it receives every flagged command and returns
+    ``True`` to apply the proposed redaction, a replacement command to redact
+    manually, ``False`` to keep it, or ``None`` to skip it. Applied and kept
+    outcomes are stored; skipped findings leave the database unchanged.
+    """
     if batch_size < 1:
         raise ValueError("batch_size must be positive")
     if timeout < 1:
@@ -421,7 +497,7 @@ def _scan_database(
 
     connection: sqlite3.Connection | None = None
     rule_counts: Counter[str] = Counter()
-    scanned = flagged = findings = 0
+    scanned = flagged = findings = kept = skipped = 0
     scanner = "gitleaks unknown"
     stage_key = os.urandom(32)
     try:
@@ -430,22 +506,30 @@ def _scan_database(
         connection.execute("PRAGMA foreign_keys=ON")
         connection.execute(_SCAN_TABLE)
         connection.commit()
-        if apply:
+        if apply or review is not None:
             connection.execute("PRAGMA temp_store=MEMORY")
             connection.execute(_STAGE_TABLE)
         for batch in _batches(connection, batch_size=batch_size, rescan=rescan):
             if not scanned:
                 scanner = _gitleaks_version(executable, timeout=min(timeout, 10))
             batch_scans = _scan_batch(batch, executable=executable, timeout=timeout)
-            if apply:
-                _stage(connection, batch_scans, key=stage_key)
+            decisions: dict[int, _ReviewDecision] = {}
+            if review is not None:
+                for scan in batch_scans:
+                    if scan.findings:
+                        decision = _review_decision(scan, result=review(scan))
+                        decisions[scan.row.id] = decision
+                        kept += int(decision.status == "kept")
+                        skipped += int(decision.status == "skip")
+            if apply or review is not None:
+                _stage(connection, batch_scans, key=stage_key, decisions=decisions)
             scanned += len(batch_scans)
             for scan in batch_scans:
                 if scan.findings:
                     flagged += 1
                     findings += scan.findings
                     rule_counts.update(scan.rules)
-        redacted = _apply_staged(connection, key=stage_key, scanner=scanner) if apply else 0
+        redacted = _apply_staged(connection, key=stage_key, scanner=scanner) if apply or review is not None else 0
         if redacted:
             _purge_deleted_content(connection)
     except sqlite3.Error as error:
@@ -453,4 +537,4 @@ def _scan_database(
     finally:
         if connection is not None:
             connection.close()
-    return _ScanSummary(scanned, flagged, findings, redacted, dict(sorted(rule_counts.items())))
+    return _ScanSummary(scanned, flagged, findings, redacted, dict(sorted(rule_counts.items())), kept, skipped)

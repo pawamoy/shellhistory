@@ -126,12 +126,12 @@ def _secrets_command(args: list[str] | None = None) -> int:
     """
     parser = argparse.ArgumentParser(
         prog="shellhistory secrets",
-        description="Scan command history locally with Gitleaks without printing secret values.",
+        description="Scan command history locally with Gitleaks and review detected credentials.",
     )
     parser.add_argument(
         "--apply",
         action="store_true",
-        help="Redact findings, save scan states, VACUUM the database, and truncate its WAL.",
+        help="Redact all findings without prompting, save scan states, VACUUM the database, and truncate its WAL.",
     )
     parser.add_argument(
         "--rescan",
@@ -147,6 +147,33 @@ def _secrets_command(args: list[str] | None = None) -> int:
     from shellhistory._internal import _secrets  # noqa: PLC0415
 
     db.engine.dispose()
+
+    def review(scan: _secrets._RowScan) -> bool | str | None:
+        """Print one finding and obtain its redaction decision."""
+        rules = ", ".join(scan.rules) or "unknown rule"
+        print(f"\nCommand {scan.row.id}: {scan.findings} finding(s) ({rules})")
+        print("Recorded command:")
+        print(scan.row.cmd)
+        print("Redacted command:")
+        print(scan.redacted)
+        while True:
+            try:
+                answer = input("Choose [a]pply, [r]edact, [k]eep, or [s]kip: ").strip().lower()
+            except EOFError as error:
+                raise _secrets._SecretsError("interactive review ended before all findings were decided") from error
+            if answer in {"a", "apply"}:
+                return True
+            if answer in {"r", "redact"}:
+                try:
+                    return input("Write the redacted command: ")
+                except EOFError as error:
+                    raise _secrets._SecretsError("interactive review ended before all findings were decided") from error
+            if answer in {"k", "keep"}:
+                return False
+            if answer in {"s", "skip"}:
+                return None
+            print("Please enter a (apply), r (redact), k (keep), or s (skip).")
+
     try:
         report = _secrets._scan_database(
             db.DB_PATH,
@@ -155,6 +182,7 @@ def _secrets_command(args: list[str] | None = None) -> int:
             batch_size=opts.batch_size,
             executable=opts.gitleaks,
             timeout=opts.timeout,
+            review=None if opts.apply else review,
         )
     except (OSError, ValueError, _secrets._SecretsError) as error:
         print(f"secret scan failed: {error}", file=sys.stderr)
@@ -166,7 +194,7 @@ def _secrets_command(args: list[str] | None = None) -> int:
     if opts.apply:
         print(f"redacted {report.redacted} commands")
     elif report.flagged:
-        print("dry run: run `shellhistory secrets --apply` to redact these findings")
+        print(f"redacted {report.redacted} commands; kept {report.kept} commands; skipped {report.skipped} commands")
     return 0
 
 

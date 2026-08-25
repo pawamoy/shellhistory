@@ -131,6 +131,62 @@ def test_dry_run_batches_rows_without_changing_the_database(tmp_path: Path, monk
     assert "shell-url-password" in calls[1]["env"]["GITLEAKS_CONFIG_TOML"]
 
 
+def test_review_records_kept_and_redacted_findings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    db_path = tmp_path / "history.sqlite3"
+    first = f"tool --token={TOKEN}"
+    second = f"tool --password={TOKEN}"
+    _write(db_path, start="1787000000000000", cmd=first)
+    _write(db_path, start="1787000001000000", cmd=second)
+    findings = [
+        {"StartLine": 2, "Secret": TOKEN, "Match": TOKEN, "RuleID": "shell-sensitive-option"},
+        {"StartLine": 4, "Secret": TOKEN, "Match": TOKEN, "RuleID": "shell-sensitive-option"},
+    ]
+    _fake_gitleaks(monkeypatch, findings)
+    reviewed = []
+
+    def review(scan: _secrets._RowScan) -> bool:
+        reviewed.append(scan)
+        return scan.row.cmd == second
+
+    report = _secrets._scan_database(db_path, batch_size=10, review=review)
+
+    assert [scan.row.cmd for scan in reviewed] == [first, second]
+    assert report.redacted == 1
+    assert report.kept == 1
+    assert _commands(db_path) == [first, second.replace(TOKEN, "[REDACTED]")]
+    assert _states(db_path) == [
+        ("kept", '["shell-sensitive-option"]'),
+        ("redacted", '["shell-sensitive-option"]'),
+    ]
+    assert _secrets._scan_database(db_path).scanned == 0
+
+
+def test_review_can_redact_manually_or_skip_without_recording_a_scan(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    db_path = tmp_path / "history.sqlite3"
+    first = f"tool --token={TOKEN}"
+    second = f"tool --password={TOKEN}"
+    _write(db_path, start="1787000000000000", cmd=first)
+    _write(db_path, start="1787000001000000", cmd=second)
+    findings = [
+        {"StartLine": 2, "Secret": TOKEN, "Match": TOKEN, "RuleID": "shell-sensitive-option"},
+        {"StartLine": 4, "Secret": TOKEN, "Match": TOKEN, "RuleID": "shell-sensitive-option"},
+    ]
+    _fake_gitleaks(monkeypatch, findings)
+
+    def review(scan: _secrets._RowScan) -> str | None:
+        return None if scan.row.cmd == first else "tool --password=custom-redaction"
+
+    report = _secrets._scan_database(db_path, batch_size=10, review=review)
+
+    assert report.redacted == 1
+    assert report.skipped == 1
+    assert _commands(db_path) == [first, "tool --password=custom-redaction"]
+    assert _states(db_path) == [("redacted", '["shell-sensitive-option"]')]
+
+
 def test_apply_redacts_secret_spans_and_records_scan_states(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -209,6 +265,55 @@ def test_multiline_commands_map_findings_to_the_right_row(tmp_path: Path, monkey
 
     assert report.flagged == 1
     assert _commands(db_path)[1] == "tool \\\n+  --password [REDACTED]"
+
+
+def test_cross_command_finding_is_rescanned_in_smaller_batches(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    db_path = tmp_path / "history.sqlite3"
+    _write(db_path, start="1787000000000000", cmd="echo harmless")
+    _write(db_path, start="1787000001000000", cmd=f"tool --token={TOKEN}")
+    calls = []
+
+    def run(argv: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        calls.append(kwargs.get("input"))
+        if argv[-1] == "version":
+            return subprocess.CompletedProcess(argv, 0, stdout="8.29.1\n", stderr="")
+        canary = {
+            "StartLine": 1,
+            "EndLine": 1,
+            "Secret": _secrets._CANARY,
+            "Match": _secrets._CANARY,
+            "RuleID": "shellhistory-scanner-canary",
+        }
+        payload = kwargs["input"]
+        if "echo harmless" in payload and TOKEN in payload:
+            # This points from the first command into the second one, so it
+            # must never be attributed to either row in the original batch.
+            findings = [{"StartLine": 2, "EndLine": 4, "Secret": TOKEN, "Match": TOKEN, "RuleID": "cross"}]
+        elif TOKEN in payload:
+            findings = [
+                {
+                    "StartLine": 2,
+                    "EndLine": 2,
+                    "Secret": TOKEN,
+                    "Match": TOKEN,
+                    "RuleID": "shell-sensitive-option",
+                },
+            ]
+        else:
+            findings = []
+        return subprocess.CompletedProcess(argv, 0, stdout=json.dumps([canary, *findings]), stderr="")
+
+    monkeypatch.setattr(_secrets.subprocess, "run", run)
+
+    report = _secrets._scan_database(db_path, apply=True, batch_size=2)
+
+    assert report.flagged == 1
+    assert _commands(db_path) == ["echo harmless", "tool --token=[REDACTED]"]
+    # One batch plus one isolated scan per command.
+    assert len([call for call in calls if call is not None]) == 3
 
 
 def test_unlocatable_finding_redacts_the_whole_command(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

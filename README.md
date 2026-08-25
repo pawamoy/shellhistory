@@ -108,15 +108,19 @@ library and never makes the prompt wait on it.
 ### Secret scanning and redaction
 
 Install [Gitleaks](https://github.com/gitleaks/gitleaks), then scan recorded
-commands locally without changing them:
+commands locally. Each finding shows the recorded command, its matching rules,
+and the proposed redaction. Choose **apply** to use the proposal, **redact** to
+write a replacement command, **keep** to record an intentional exception, or
+**skip** to leave the command and its scan state unchanged:
 
 ```console
 shellhistory secrets
 ```
 
-The report only prints counts, row totals, and rule names: it never prints
-commands or detected values. Review the dry-run totals, close the web app and
-other processes holding the database open, then apply the redactions:
+Applied and kept choices are recorded in `secret_scans`, so a reviewed command
+is not returned by later scans unless you use `--rescan`; skipped commands are
+returned again. Close the web app and other processes holding the database open
+before reviewing findings. To redact every finding without prompting:
 
 ```console
 shellhistory secrets --apply
@@ -128,8 +132,8 @@ credentials in URLs, and common short password options. A canary in every batch
 makes the scan fail rather than silently marking rows clean when Gitleaks or its
 configuration is broken.
 
-Applied scans record each row as `clean` or `redacted` in `secret_scans`; commands
-without a record are unscanned. Later scans skip recorded rows, so use
+Applied scans record each row as `clean`, `kept`, or `redacted` in `secret_scans`;
+commands without a record are unscanned. Later scans skip recorded rows, so use
 `shellhistory secrets --rescan` (or add `--apply`) after upgrading Gitleaks or
 changing scanner rules. Redaction replaces only the extracted value with
 `[REDACTED]`; if a finding cannot be mapped back to an exact value, the whole

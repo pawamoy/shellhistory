@@ -72,11 +72,11 @@ def test_show_debug_info(capsys: pytest.CaptureFixture) -> None:
     assert "packages" in captured
 
 
-def test_secrets_subcommand_is_a_dry_run_by_default(
+def test_secrets_subcommand_reviews_findings_by_default(
     capsys: pytest.CaptureFixture,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Do not expose findings or mutate commands without --apply."""
+    """Default scans pass an interactive review callback to the scanner."""
     called = {}
 
     def scan_database(*_args: Any, **kwargs: Any) -> _secrets._ScanSummary:
@@ -87,9 +87,59 @@ def test_secrets_subcommand_is_a_dry_run_by_default(
     assert main(["secrets", "--batch-size", "25"]) == 0
     captured = capsys.readouterr()
     assert "found 3 findings in 2 commands" in captured.out
-    assert "dry run" in captured.out
     assert called["apply"] is False
     assert called["batch_size"] == 25
+    assert callable(called["review"])
+
+
+def test_secrets_subcommand_prints_a_command_and_applies_the_suggestion(
+    capsys: pytest.CaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Interactive review displays the finding and returns the chosen action."""
+
+    def scan_database(*_args: Any, **kwargs: Any) -> _secrets._ScanSummary:
+        decision = kwargs["review"](
+            _secrets._RowScan(
+                row=_secrets._Row(42, "tool --token=example-token-123456789"),
+                redacted="tool --token=[REDACTED]",
+                rules=("shell-sensitive-option",),
+                findings=1,
+            ),
+        )
+        assert decision is True
+        return _secrets._ScanSummary(1, 1, 1, 1, {"shell-sensitive-option": 1})
+
+    monkeypatch.setattr(_secrets, "_scan_database", scan_database)
+    monkeypatch.setattr("builtins.input", lambda _prompt: "apply")
+    assert main(["secrets"]) == 0
+    captured = capsys.readouterr()
+    assert "Command 42: 1 finding(s) (shell-sensitive-option)" in captured.out
+    assert "Recorded command:\ntool --token=example-token-123456789" in captured.out
+    assert "Redacted command:\ntool --token=[REDACTED]" in captured.out
+
+
+def test_secrets_subcommand_accepts_a_manual_redaction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The redact action returns the replacement command written by the user."""
+
+    def scan_database(*_args: Any, **kwargs: Any) -> _secrets._ScanSummary:
+        decision = kwargs["review"](
+            _secrets._RowScan(
+                row=_secrets._Row(42, "tool --token=example-token-123456789"),
+                redacted="tool --token=[REDACTED]",
+                rules=("shell-sensitive-option",),
+                findings=1,
+            ),
+        )
+        assert decision == "tool --token=custom-redaction"
+        return _secrets._ScanSummary(1, 1, 1, 1, {"shell-sensitive-option": 1})
+
+    answers = iter(("redact", "tool --token=custom-redaction"))
+    monkeypatch.setattr(_secrets, "_scan_database", scan_database)
+    monkeypatch.setattr("builtins.input", lambda _prompt: next(answers))
+    assert main(["secrets"]) == 0
 
 
 def test_secrets_subcommand_reports_scanner_errors_without_secret_output(

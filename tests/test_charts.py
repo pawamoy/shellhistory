@@ -262,7 +262,7 @@ def test_charts_use_a_readable_type_scale(client: FlaskClient) -> None:
 def test_calendar_logarithmic_color_axis_starts_above_zero(client: FlaskClient) -> None:
     script = client.get("/static/js/calendar.js").get_data(as_text=True)
 
-    assert 'colorAxis: { min: 1, max: data.max' in script
+    assert "colorAxis: { min: 1, max: data.max" in script
     assert 'type: "logarithmic"' in script
 
 
