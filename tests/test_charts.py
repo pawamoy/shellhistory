@@ -235,9 +235,40 @@ def test_every_chart_survives_an_empty_database(empty_client: FlaskClient, chart
     assert empty_client.get(f"/{chart.slug}_json").status_code == 200
 
 
-@pytest.mark.parametrize("path", ["/", "/facets_json", "/stats_json", "/wordcloud_json"])
+@pytest.mark.parametrize("path", ["/", "/admin/", "/facets_json", "/stats_json", "/wordcloud_json"])
 def test_the_pages_that_are_not_charts(client: FlaskClient, path: str) -> None:
     assert client.get(path).status_code == 200
+
+
+def test_admin_lists_recorded_commands(client: FlaskClient) -> None:
+    # Render populated rows so the inline editing fields are included.
+    response = client.get("/admin/history/")
+
+    assert response.status_code == 200
+    assert "git status" in response.get_data(as_text=True)
+
+
+@pytest.mark.parametrize("view", ["details", "edit"])
+def test_admin_opens_a_recorded_command(client: FlaskClient, view: str) -> None:
+    history_id = db.get_session().query(db.History.id).filter_by(cmd="git status").scalar()
+
+    response = client.get(f"/admin/history/{view}/", query_string={"id": history_id})
+
+    assert response.status_code == 200
+    assert "git status" in response.get_data(as_text=True)
+
+
+def test_admin_saves_an_inline_command_edit(client: FlaskClient) -> None:
+    history_id = db.get_session().query(db.History.id).filter_by(cmd="git status").scalar()
+
+    response = client.post("/admin/history/ajax/update/", data={"list_form_pk": history_id, "cmd": "git diff"})
+
+    assert response.status_code == 200
+
+    # Read through a new request to verify that the edit was committed.
+    details = client.get("/admin/history/details/", query_string={"id": history_id})
+    assert details.status_code == 200
+    assert "git diff" in details.get_data(as_text=True)
 
 
 def test_chart_library_version_is_pinned(client: FlaskClient) -> None:
@@ -250,8 +281,10 @@ def test_chart_library_version_is_pinned(client: FlaskClient) -> None:
 
 
 def test_charts_use_a_readable_type_scale(client: FlaskClient) -> None:
-    shared = client.get("/static/js/sh.js").get_data(as_text=True)
-    calendar = client.get("/static/js/calendar.js").get_data(as_text=True)
+    with client.get("/static/js/sh.js") as response:
+        shared = response.get_data(as_text=True)
+    with client.get("/static/js/calendar.js") as response:
+        calendar = response.get_data(as_text=True)
 
     assert 'fontSize: "1.125rem"' in shared
     assert shared.count('fontSize: "1rem"') == 3
@@ -260,14 +293,16 @@ def test_charts_use_a_readable_type_scale(client: FlaskClient) -> None:
 
 
 def test_calendar_logarithmic_color_axis_starts_above_zero(client: FlaskClient) -> None:
-    script = client.get("/static/js/calendar.js").get_data(as_text=True)
+    with client.get("/static/js/calendar.js") as response:
+        script = response.get_data(as_text=True)
 
     assert "colorAxis: { min: 1, max: data.max" in script
     assert 'type: "logarithmic"' in script
 
 
 def test_markov_low_counts_remain_visible(client: FlaskClient) -> None:
-    script = client.get("/static/js/markov.js").get_data(as_text=True)
+    with client.get("/static/js/markov.js") as response:
+        script = response.get_data(as_text=True)
 
     assert "min: 1" in script
     assert 'minColor: "#dbeaf7"' in script
@@ -431,8 +466,10 @@ def test_every_chart_page_names_a_script_that_exists() -> None:
 @pytest.mark.parametrize("slug", ["markov", "markov_full"])
 def test_markov_charts_use_their_square_container(client: FlaskClient, slug: str) -> None:
     page = client.get(f"/{slug}").get_data(as_text=True)
-    css = client.get("/static/css/home.css").get_data(as_text=True)
-    script = client.get("/static/js/markov.js").get_data(as_text=True)
+    with client.get("/static/css/home.css") as response:
+        css = response.get_data(as_text=True)
+    with client.get("/static/js/markov.js") as response:
+        script = response.get_data(as_text=True)
 
     assert 'class="sh-chart sh-markov-chart"' in page
     assert "aspect-ratio: 1 / 1" in css

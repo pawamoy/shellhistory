@@ -29,9 +29,9 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "flask>=1.0,<3",
-    # 2.0 removed the template_mode argument that app.py passes to Admin().
-    "flask-admin>=1.5,<2",
+    "flask>=3.1.3,<4",
+    # 2.1 deprecates the standalone SQLAlchemy sessions used by the app.
+    "flask-admin>=2.0.2,<2.1",
     # 1.4 is the floor: declarative_base moved to sqlalchemy.orm there.
     "sqlalchemy>=1.4,<2.1",
     "tqdm>=4.28",

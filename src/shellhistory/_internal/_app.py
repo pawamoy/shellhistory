@@ -23,11 +23,12 @@ import secrets
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from functools import partial
-from typing import Any, ClassVar
+from typing import Any
 
 from flask import Flask, Response, jsonify, render_template, request
 from flask_admin import Admin
 from flask_admin.contrib.sqla import ModelView
+from flask_admin.theme import Bootstrap4Theme
 from markupsafe import Markup
 
 from shellhistory._internal import _charts as charts
@@ -76,7 +77,7 @@ class HistoryModelView(ModelView):
     # host, user, uuid, tty, shell, level and parents belong to the session the
     # command ran in, so they are reached through the relationship rather than
     # repeated on every row.
-    column_list: ClassVar[list] = [
+    column_list = [  # noqa: RUF012 - flask-admin sets this per instance
         "id",
         "start",
         "stop",
@@ -121,7 +122,7 @@ class HistoryModelView(ModelView):
     ]
     column_formatters_detail = {"session.parents": format_parents}  # noqa: RUF012
 
-    column_searchable_list: ClassVar[list] = [
+    column_searchable_list = [  # noqa: RUF012
         "type",
         "code",
         "path",
@@ -153,7 +154,7 @@ class HistoryModelView(ModelView):
     # silently rewrite unrelated history.
 
     column_editable_list = ["type", "code", "path", "cmd"]  # noqa: RUF012
-    form_excluded_columns: ClassVar[list] = ["start", "stop"]
+    form_excluded_columns = ["start", "stop"]  # noqa: RUF012
     # form_widget_args = {
     #     'start': {'format': '%Y-%m-%d %H:%M:%S.%f'},
     #     'stop': {'format': '%Y-%m-%d %H:%M:%S.%f'},
@@ -161,7 +162,7 @@ class HistoryModelView(ModelView):
     # }
 
 
-admin = Admin(app, name="Shell History", template_mode="bootstrap3")
+admin = Admin(app, name="Shell History", theme=Bootstrap4Theme(fluid=True))
 admin.add_view(HistoryModelView(db.History, db.get_session()))
 
 

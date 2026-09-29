@@ -157,9 +157,13 @@ def connect(db_path: str) -> sqlite3.Connection:
     # One writer per recorded command, any number of shells: WAL keeps writers
     # from blocking readers, and busy_timeout makes a writer that loses the race
     # wait its turn instead of raising SQLITE_BUSY and losing the command.
-    connection.execute("PRAGMA journal_mode=WAL")
-    connection.execute("PRAGMA busy_timeout=5000")
-    connection.execute("PRAGMA synchronous=NORMAL")
+    try:
+        connection.execute("PRAGMA journal_mode=WAL")
+        connection.execute("PRAGMA busy_timeout=5000")
+        connection.execute("PRAGMA synchronous=NORMAL")
+    except sqlite3.Error:
+        connection.close()
+        raise
     return connection
 
 
