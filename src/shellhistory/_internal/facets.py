@@ -40,8 +40,7 @@ from typing import TYPE_CHECKING, Any
 from flask import request
 from sqlalchemy import func
 
-from shellhistory._internal import _db as db
-from shellhistory._internal import _env as env
+from shellhistory._internal import db, env
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator, Sequence
@@ -138,7 +137,7 @@ def _environment_facet(name: str, label: str) -> Facet:
     """Build the facet reading one axis out of the process ancestry.
 
     Parameters:
-        name: The axis name, as listed in `_env.AXES`.
+        name: The axis name, as listed in `env.AXES`.
         label: How the axis is named in the interface.
 
     Returns:

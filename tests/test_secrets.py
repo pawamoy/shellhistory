@@ -29,13 +29,13 @@ from typing import Any
 
 import pytest
 
-from shellhistory._internal import _record, _secrets
+from shellhistory._internal import record, secrets
 
 TOKEN = "example-token-123456789"  # noqa: S105 - scanner fixture
 
 
 def _write(db_path: Path, *, start: str, cmd: str) -> None:
-    _record.record(
+    record.record(
         {
             "start": start,
             "stop": str(int(start) + 100),
@@ -65,13 +65,13 @@ def _fake_gitleaks(monkeypatch: pytest.MonkeyPatch, findings: list[dict[str, Any
         canary = {
             "StartLine": 1,
             "EndLine": 1,
-            "Secret": _secrets._CANARY,
-            "Match": _secrets._CANARY,
+            "Secret": secrets._CANARY,
+            "Match": secrets._CANARY,
             "RuleID": "shellhistory-scanner-canary",
         }
         return subprocess.CompletedProcess(argv, 0, stdout=json.dumps([canary, *findings]), stderr="")
 
-    monkeypatch.setattr(_secrets.subprocess, "run", run)
+    monkeypatch.setattr(secrets.subprocess, "run", run)
     return calls
 
 
@@ -92,7 +92,7 @@ def _states(db_path: Path) -> list[tuple[str, str]]:
 
 
 def test_shell_rules_extend_the_gitleaks_defaults() -> None:
-    config = tomllib.loads(_secrets._CONFIG)
+    config = tomllib.loads(secrets._CONFIG)
     assert config["extend"]["useDefault"] is True
     assert "shell-authorization-header" in {rule["id"] for rule in config["rules"]}
 
@@ -112,7 +112,7 @@ def test_dry_run_batches_rows_without_changing_the_database(tmp_path: Path, monk
     ]
     calls = _fake_gitleaks(monkeypatch, findings)
 
-    report = _secrets._scan_database(db_path, batch_size=10)
+    report = secrets._scan_database(db_path, batch_size=10)
 
     assert report.scanned == 2
     assert report.flagged == 1
@@ -139,11 +139,11 @@ def test_review_records_kept_and_redacted_findings(tmp_path: Path, monkeypatch: 
     _fake_gitleaks(monkeypatch, findings)
     reviewed = []
 
-    def review(scan: _secrets._RowScan) -> bool:
+    def review(scan: secrets._RowScan) -> bool:
         reviewed.append(scan)
         return scan.row.cmd == second
 
-    report = _secrets._scan_database(db_path, batch_size=10, review=review)
+    report = secrets._scan_database(db_path, batch_size=10, review=review)
 
     assert [scan.row.cmd for scan in reviewed] == [first, second]
     assert report.redacted == 1
@@ -153,7 +153,7 @@ def test_review_records_kept_and_redacted_findings(tmp_path: Path, monkeypatch: 
         ("kept", '["shell-sensitive-option"]'),
         ("redacted", '["shell-sensitive-option"]'),
     ]
-    assert _secrets._scan_database(db_path).scanned == 0
+    assert secrets._scan_database(db_path).scanned == 0
 
 
 def test_review_can_redact_manually_or_skip_without_recording_a_scan(
@@ -171,10 +171,10 @@ def test_review_can_redact_manually_or_skip_without_recording_a_scan(
     ]
     _fake_gitleaks(monkeypatch, findings)
 
-    def review(scan: _secrets._RowScan) -> str | None:
+    def review(scan: secrets._RowScan) -> str | None:
         return None if scan.row.cmd == first else "tool --password=custom-redaction"
 
-    report = _secrets._scan_database(db_path, batch_size=10, review=review)
+    report = secrets._scan_database(db_path, batch_size=10, review=review)
 
     assert report.redacted == 1
     assert report.skipped == 1
@@ -201,7 +201,7 @@ def test_apply_redacts_secret_spans_and_records_scan_states(
     ]
     _fake_gitleaks(monkeypatch, findings)
 
-    report = _secrets._scan_database(db_path, apply=True, batch_size=10)
+    report = secrets._scan_database(db_path, apply=True, batch_size=10)
 
     assert report.redacted == 1
     assert _commands(db_path) == [command.replace(TOKEN, "[REDACTED]"), "echo harmless"]
@@ -228,14 +228,14 @@ def test_scanned_rows_are_skipped_unless_rescan_is_requested(
         },
     ]
     calls = _fake_gitleaks(monkeypatch, findings)
-    _secrets._scan_database(db_path, apply=True)
+    secrets._scan_database(db_path, apply=True)
 
-    assert _secrets._scan_database(db_path).scanned == 0
+    assert secrets._scan_database(db_path).scanned == 0
     assert len(calls) == 2
 
     calls.clear()
     _fake_gitleaks(monkeypatch, [])
-    assert _secrets._scan_database(db_path, apply=True, rescan=True).scanned == 1
+    assert secrets._scan_database(db_path, apply=True, rescan=True).scanned == 1
     assert _states(db_path)[0][0] == "redacted"
 
 
@@ -256,7 +256,7 @@ def test_multiline_commands_map_findings_to_the_right_row(tmp_path: Path, monkey
     ]
     _fake_gitleaks(monkeypatch, findings)
 
-    report = _secrets._scan_database(db_path, apply=True, batch_size=2)
+    report = secrets._scan_database(db_path, apply=True, batch_size=2)
 
     assert report.flagged == 1
     assert _commands(db_path)[1] == "tool \\\n+  --password [REDACTED]"
@@ -278,8 +278,8 @@ def test_cross_command_finding_is_rescanned_in_smaller_batches(
         canary = {
             "StartLine": 1,
             "EndLine": 1,
-            "Secret": _secrets._CANARY,
-            "Match": _secrets._CANARY,
+            "Secret": secrets._CANARY,
+            "Match": secrets._CANARY,
             "RuleID": "shellhistory-scanner-canary",
         }
         payload = kwargs["input"]
@@ -301,9 +301,9 @@ def test_cross_command_finding_is_rescanned_in_smaller_batches(
             findings = []
         return subprocess.CompletedProcess(argv, 0, stdout=json.dumps([canary, *findings]), stderr="")
 
-    monkeypatch.setattr(_secrets.subprocess, "run", run)
+    monkeypatch.setattr(secrets.subprocess, "run", run)
 
-    report = _secrets._scan_database(db_path, apply=True, batch_size=2)
+    report = secrets._scan_database(db_path, apply=True, batch_size=2)
 
     assert report.flagged == 1
     assert _commands(db_path) == ["echo harmless", "tool --token=[REDACTED]"]
@@ -319,7 +319,7 @@ def test_unlocatable_finding_redacts_the_whole_command(tmp_path: Path, monkeypat
         [{"StartLine": 2, "Secret": "decoded-value", "Match": "decoded-value", "RuleID": "decoded"}],
     )
 
-    _secrets._scan_database(db_path, apply=True)
+    secrets._scan_database(db_path, apply=True)
 
     assert _commands(db_path) == ["[REDACTED]"]
 
@@ -331,9 +331,9 @@ def test_invalid_scanner_output_does_not_modify_commands(tmp_path: Path, monkeyp
     def run(argv: list[str], **_kwargs: Any) -> subprocess.CompletedProcess[str]:
         return subprocess.CompletedProcess(argv, 0, stdout="not json", stderr=TOKEN)
 
-    monkeypatch.setattr(_secrets.subprocess, "run", run)
-    with pytest.raises(_secrets._SecretsError, match="valid JSON"):
-        _secrets._scan_database(db_path, apply=True)
+    monkeypatch.setattr(secrets.subprocess, "run", run)
+    with pytest.raises(secrets._SecretsError, match="valid JSON"):
+        secrets._scan_database(db_path, apply=True)
     assert _commands(db_path) == [f"tool --token={TOKEN}"]
     assert _states(db_path) == []
 
@@ -345,9 +345,9 @@ def test_missing_canary_does_not_mark_rows_clean(tmp_path: Path, monkeypatch: py
     def run(argv: list[str], **_kwargs: Any) -> subprocess.CompletedProcess[str]:
         return subprocess.CompletedProcess(argv, 0, stdout="[]", stderr="")
 
-    monkeypatch.setattr(_secrets.subprocess, "run", run)
-    with pytest.raises(_secrets._SecretsError, match="self-test failed"):
-        _secrets._scan_database(db_path, apply=True)
+    monkeypatch.setattr(secrets.subprocess, "run", run)
+    with pytest.raises(secrets._SecretsError, match="self-test failed"):
+        secrets._scan_database(db_path, apply=True)
     assert _states(db_path) == []
 
 
@@ -368,8 +368,8 @@ def test_apply_stages_batches_before_changing_commands(tmp_path: Path, monkeypat
             {
                 "StartLine": 1,
                 "EndLine": 1,
-                "Secret": _secrets._CANARY,
-                "Match": _secrets._CANARY,
+                "Secret": secrets._CANARY,
+                "Match": secrets._CANARY,
                 "RuleID": "shellhistory-scanner-canary",
             },
             {
@@ -382,8 +382,8 @@ def test_apply_stages_batches_before_changing_commands(tmp_path: Path, monkeypat
         ]
         return subprocess.CompletedProcess(argv, 0, stdout=json.dumps(findings), stderr="")
 
-    monkeypatch.setattr(_secrets.subprocess, "run", run)
-    with pytest.raises(_secrets._SecretsError, match="valid JSON"):
-        _secrets._scan_database(db_path, apply=True, batch_size=1)
+    monkeypatch.setattr(secrets.subprocess, "run", run)
+    with pytest.raises(secrets._SecretsError, match="valid JSON"):
+        secrets._scan_database(db_path, apply=True, batch_size=1)
     assert _commands(db_path) == [f"tool --token={TOKEN}", "echo harmless"]
     assert _states(db_path) == []

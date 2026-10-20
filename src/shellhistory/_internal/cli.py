@@ -143,12 +143,11 @@ def _secrets_command(args: list[str] | None = None) -> int:
     parser.add_argument("--timeout", type=int, default=120, help="Seconds allowed for each batch.")
     opts = parser.parse_args(args=args)
 
-    from shellhistory._internal import _db as db  # noqa: PLC0415
-    from shellhistory._internal import _secrets  # noqa: PLC0415
+    from shellhistory._internal import db, secrets  # noqa: PLC0415
 
     db.engine.dispose()
 
-    def review(scan: _secrets._RowScan) -> bool | str | None:
+    def review(scan: secrets._RowScan) -> bool | str | None:
         """Print one finding and obtain its redaction decision."""
         rules = ", ".join(scan.rules) or "unknown rule"
         print(f"\nCommand {scan.row.id}: {scan.findings} finding(s) ({rules})")
@@ -160,14 +159,14 @@ def _secrets_command(args: list[str] | None = None) -> int:
             try:
                 answer = input("Choose [a]pply, [r]edact, [k]eep, or [s]kip: ").strip().lower()
             except EOFError as error:
-                raise _secrets._SecretsError("interactive review ended before all findings were decided") from error
+                raise secrets._SecretsError("interactive review ended before all findings were decided") from error
             if answer in {"a", "apply"}:
                 return True
             if answer in {"r", "redact"}:
                 try:
                     return input("Write the redacted command: ")
                 except EOFError as error:
-                    raise _secrets._SecretsError("interactive review ended before all findings were decided") from error
+                    raise secrets._SecretsError("interactive review ended before all findings were decided") from error
             if answer in {"k", "keep"}:
                 return False
             if answer in {"s", "skip"}:
@@ -175,7 +174,7 @@ def _secrets_command(args: list[str] | None = None) -> int:
             print("Please enter a (apply), r (redact), k (keep), or s (skip).")
 
     try:
-        report = _secrets._scan_database(
+        report = secrets._scan_database(
             db.DB_PATH,
             apply=opts.apply,
             rescan=opts.rescan,
@@ -184,7 +183,7 @@ def _secrets_command(args: list[str] | None = None) -> int:
             timeout=opts.timeout,
             review=None if opts.apply else review,
         )
-    except (OSError, ValueError, _secrets._SecretsError) as error:
+    except (OSError, ValueError, secrets._SecretsError) as error:
         print(f"secret scan failed: {error}", file=sys.stderr)
         return 1
 
@@ -216,7 +215,7 @@ def web() -> int:
     """
     # Imported here, not at module level: `shellhistory-location` runs from every
     # shell's startup file, and it must not pay for importing Flask.
-    from shellhistory._internal._app import app  # noqa: PLC0415
+    from shellhistory._internal.app import app  # noqa: PLC0415
 
     app.run()
     return 0
@@ -228,8 +227,7 @@ def migrate() -> int:
     Returns:
         An exit code.
     """
-    from shellhistory._internal import _db as db  # noqa: PLC0415
-    from shellhistory._internal import _migrations as migrations  # noqa: PLC0415
+    from shellhistory._internal import db, migrations  # noqa: PLC0415
 
     if not db.is_legacy_schema():
         print(f"{db.DB_PATH} is already on the current schema, nothing to do.")
@@ -250,7 +248,7 @@ def import_legacy(path: str | None = None) -> int:
     Returns:
         An exit code.
     """
-    from shellhistory._internal import _migrations as migrations  # noqa: PLC0415
+    from shellhistory._internal import migrations  # noqa: PLC0415
 
     report = migrations.import_file(path) if path else migrations.import_history()
     print(f"imported {report.inserted} records ({report.duplicates} already present)")

@@ -24,7 +24,7 @@
 # this whole process) and it is spawned in the background.
 #
 # Usage:
-#     _record.py START STOP UUID HOST USER TTY PARENTS SHELL LEVEL TYPE CODE PATH CMD
+#     record.py START STOP UUID HOST USER TTY PARENTS SHELL LEVEL TYPE CODE PATH CMD
 #
 # START and STOP are microseconds since the epoch. Every value is passed as a
 # separate argument and bound as a query parameter, so no amount of punctuation in
@@ -259,7 +259,7 @@ def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     if len(argv) != len(FIELDS):
         usage = " ".join(field.upper() for field in FIELDS)
-        print(f"usage: _record.py {usage}", file=sys.stderr)  # noqa: T201 - this is a command line tool
+        print(f"usage: record.py {usage}", file=sys.stderr)  # noqa: T201 - this is a command line tool
         return 2
 
     values = dict(zip(FIELDS, argv, strict=True))

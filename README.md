@@ -102,7 +102,7 @@ After the command has finished, we store the return code, and stop the timer.
 
 Records go straight into a SQLite database (`~/.shellhistory/db.sqlite3` by
 default, `$SHELLHISTORY_DB` to override). At the end of each command the shell
-spawns a small detached writer, `_record.py`, which uses nothing but the standard
+spawns a small detached writer, `record.py`, which uses nothing but the standard
 library and never makes the prompt wait on it.
 
 ### Secret scanning and redaction

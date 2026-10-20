@@ -31,10 +31,7 @@ from flask_admin.contrib.sqla import ModelView
 from flask_admin.theme import Bootstrap4Theme
 from markupsafe import Markup
 
-from shellhistory._internal import _charts as charts
-from shellhistory._internal import _db as db
-from shellhistory._internal import _facets as facets
-from shellhistory._internal import _migrations as migrations
+from shellhistory._internal import charts, db, facets, migrations
 
 # Initialization and constants ------------------------------------------------
 app = Flask(__name__)

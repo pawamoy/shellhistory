@@ -20,7 +20,7 @@
 #
 # One function per chart, each returning the data ready to be turned into JSON.
 # None of them look at the request: they take the selection -- which commands,
-# split by what -- from `_facets`, so filtering by host, by terminal or by time
+# split by what -- from `facets`, so filtering by host, by terminal or by time
 # span is the same code for all of them and is written once.
 #
 # The rule followed throughout is to make SQLite do the grouping and to fold the
@@ -39,9 +39,7 @@ from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import case, func
 
-from shellhistory._internal import _db as db
-from shellhistory._internal import _env as env
-from shellhistory._internal import _facets as facets
+from shellhistory._internal import db, env, facets
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -113,7 +111,7 @@ def time_bucket(granularity: str) -> Any:
     """Return the expression bucketing commands into periods of time.
 
     Parameters:
-        granularity: One of the keys of `_facets.GRANULARITIES`.
+        granularity: One of the keys of `facets.GRANULARITIES`.
 
     Returns:
         The SQLite expression naming a command's period.
@@ -916,7 +914,7 @@ def _period_of(moment: datetime, granularity: str) -> str:
 
     Parameters:
         moment: The instant to place.
-        granularity: One of the keys of `_facets.GRANULARITIES`.
+        granularity: One of the keys of `facets.GRANULARITIES`.
 
     Returns:
         The bucket's name.

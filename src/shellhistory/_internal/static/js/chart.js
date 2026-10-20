@@ -1,6 +1,6 @@
 /* The renderer for every chart that is a set of series over a set of buckets,
  * which is most of them. What it draws comes from the catalogue entry in
- * _app.py, so these charts need no script of their own.
+ * app.py, so these charts need no script of their own.
  */
 $(function () {
   var page = window.CHART;

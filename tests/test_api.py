@@ -92,7 +92,8 @@ def _yield_public_objects(
 
 @pytest.fixture(name="modulelevel_internal_objects", scope="module")
 def _fixture_modulelevel_internal_objects(internal_api: griffe.Module) -> list[griffe.Object | griffe.Alias]:
-    return list(_yield_public_objects(internal_api, modulelevel=True))
+    # Only CLI functions form the public API; the application modules stay internal.
+    return list(_yield_public_objects(internal_api.modules["cli"], modulelevel=True))
 
 
 @pytest.fixture(name="internal_objects", scope="module")

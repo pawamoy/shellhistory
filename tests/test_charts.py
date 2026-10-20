@@ -27,10 +27,8 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from shellhistory._internal import _charts as charts
-from shellhistory._internal import _db as db
-from shellhistory._internal import _env as env
-from shellhistory._internal._app import CHARTS, app
+from shellhistory._internal import charts, db, env
+from shellhistory._internal.app import CHARTS, app
 
 if TYPE_CHECKING:
     from collections.abc import Iterator

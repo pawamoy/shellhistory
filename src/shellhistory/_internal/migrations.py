@@ -26,7 +26,7 @@
 #   used to append to, so archived history files can still be loaded.
 #
 # Neither is needed in normal operation: the shell now writes to the database
-# directly (see `_record.py`).
+# directly (see `record.py`).
 
 import shutil
 import sqlite3
@@ -39,7 +39,7 @@ from typing import Any, NamedTuple
 
 from tqdm import tqdm
 
-from shellhistory._internal import _db as db
+from shellhistory._internal import db
 
 
 # Legacy text format ----------------------------------------------------------

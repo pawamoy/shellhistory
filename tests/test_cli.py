@@ -25,7 +25,7 @@ from typing import Any
 import pytest
 
 from shellhistory import main
-from shellhistory._internal import _secrets, debug
+from shellhistory._internal import debug, secrets
 
 
 def test_main() -> None:
@@ -79,11 +79,11 @@ def test_secrets_subcommand_reviews_findings_by_default(
     """Default scans pass an interactive review callback to the scanner."""
     called = {}
 
-    def scan_database(*_args: Any, **kwargs: Any) -> _secrets._ScanSummary:
+    def scan_database(*_args: Any, **kwargs: Any) -> secrets._ScanSummary:
         called.update(kwargs)
-        return _secrets._ScanSummary(10, 2, 3, 0, {"github-pat": 2})
+        return secrets._ScanSummary(10, 2, 3, 0, {"github-pat": 2})
 
-    monkeypatch.setattr(_secrets, "_scan_database", scan_database)
+    monkeypatch.setattr(secrets, "_scan_database", scan_database)
     assert main(["secrets", "--batch-size", "25"]) == 0
     captured = capsys.readouterr()
     assert "found 3 findings in 2 commands" in captured.out
@@ -98,19 +98,19 @@ def test_secrets_subcommand_prints_a_command_and_applies_the_suggestion(
 ) -> None:
     """Interactive review displays the finding and returns the chosen action."""
 
-    def scan_database(*_args: Any, **kwargs: Any) -> _secrets._ScanSummary:
+    def scan_database(*_args: Any, **kwargs: Any) -> secrets._ScanSummary:
         decision = kwargs["review"](
-            _secrets._RowScan(
-                row=_secrets._Row(42, "tool --token=example-token-123456789"),
+            secrets._RowScan(
+                row=secrets._Row(42, "tool --token=example-token-123456789"),
                 redacted="tool --token=[REDACTED]",
                 rules=("shell-sensitive-option",),
                 findings=1,
             ),
         )
         assert decision is True
-        return _secrets._ScanSummary(1, 1, 1, 1, {"shell-sensitive-option": 1})
+        return secrets._ScanSummary(1, 1, 1, 1, {"shell-sensitive-option": 1})
 
-    monkeypatch.setattr(_secrets, "_scan_database", scan_database)
+    monkeypatch.setattr(secrets, "_scan_database", scan_database)
     monkeypatch.setattr("builtins.input", lambda _prompt: "apply")
     assert main(["secrets"]) == 0
     captured = capsys.readouterr()
@@ -124,20 +124,20 @@ def test_secrets_subcommand_accepts_a_manual_redaction(
 ) -> None:
     """The redact action returns the replacement command written by the user."""
 
-    def scan_database(*_args: Any, **kwargs: Any) -> _secrets._ScanSummary:
+    def scan_database(*_args: Any, **kwargs: Any) -> secrets._ScanSummary:
         decision = kwargs["review"](
-            _secrets._RowScan(
-                row=_secrets._Row(42, "tool --token=example-token-123456789"),
+            secrets._RowScan(
+                row=secrets._Row(42, "tool --token=example-token-123456789"),
                 redacted="tool --token=[REDACTED]",
                 rules=("shell-sensitive-option",),
                 findings=1,
             ),
         )
         assert decision == "tool --token=custom-redaction"
-        return _secrets._ScanSummary(1, 1, 1, 1, {"shell-sensitive-option": 1})
+        return secrets._ScanSummary(1, 1, 1, 1, {"shell-sensitive-option": 1})
 
     answers = iter(("redact", "tool --token=custom-redaction"))
-    monkeypatch.setattr(_secrets, "_scan_database", scan_database)
+    monkeypatch.setattr(secrets, "_scan_database", scan_database)
     monkeypatch.setattr("builtins.input", lambda _prompt: next(answers))
     assert main(["secrets"]) == 0
 
@@ -148,10 +148,10 @@ def test_secrets_subcommand_reports_scanner_errors_without_secret_output(
 ) -> None:
     """Scanner diagnostics can contain findings, so only show our safe exception."""
 
-    def scan_database(*_args: Any, **_kwargs: Any) -> _secrets._ScanSummary:
-        raise _secrets._SecretsError("Gitleaks failed with exit status 2")
+    def scan_database(*_args: Any, **_kwargs: Any) -> secrets._ScanSummary:
+        raise secrets._SecretsError("Gitleaks failed with exit status 2")
 
-    monkeypatch.setattr(_secrets, "_scan_database", scan_database)
+    monkeypatch.setattr(secrets, "_scan_database", scan_database)
     assert main(["secrets", "--apply"]) == 1
     captured = capsys.readouterr()
     assert "exit status 2" in captured.err
